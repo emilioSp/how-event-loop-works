@@ -11,7 +11,7 @@ body {
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   background: #0d1117;
   color: #e2e8f0;
-  padding: 44px 24px 100px;
+  padding: 20px 24px 100px;
 }
 
 .page-wrap { max-width: 1060px; margin: 0 auto; }
@@ -22,16 +22,13 @@ body {
   font-size: 1.45rem; letter-spacing: 0.06em;
   text-transform: uppercase; color: #8a80b0; margin-bottom: 10px;
 }
-.page-header .tagline { display: inline-flex; align-items: center; gap: 10px; font-size: 1rem; color: #475569; }
-.method-pill {
-  background: #2d1200; color: #fb923c;
-  font-family: 'JetBrains Mono','Fira Code',monospace;
-  font-size: 0.85rem; font-weight: 800; padding: 3px 10px;
-  border-radius: 5px; border: 1px solid #5a2400;
+.page-question {
+  font-size: 1.25rem; font-weight: 700; color: #e2e8f0; margin-bottom: 10px;
 }
-.path-text {
-  font-family: 'JetBrains Mono','Fira Code',monospace;
-  font-size: 1rem; font-weight: 700; color: #e2e8f0;
+.header-img {
+  display: block; margin: 0 auto 28px;
+  max-width: 560px; width: 100%;
+  border-radius: 12px; border: 1px solid #21262d;
 }
 
 /* SECTION HEADERS */
@@ -70,23 +67,11 @@ body {
 .ph6 { background:#14100f; border-color:#2a1a18; border-left-color:#b07272; }
 .ph6 .pc-num,.ph6 .pc-name { color:#b07272; }
 
-/* priority queues */
-.pq-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-.pq-card { background:#12111d; border:1px solid #1e1048; border-left:4px solid; border-radius:10px; padding:14px 16px; }
-.pq-tick { border-left-color:#9a7ab8; }
-.pq-tick .pq-name { color:#9a7ab8; }
-.pq-prom { border-left-color:#8a80b0; }
-.pq-prom .pq-name { color:#8a80b0; }
-.pq-name { font-size:0.95rem; font-weight:700; margin-bottom:6px; }
-.pq-desc { font-size:0.84rem; color:#64748b; line-height:1.6; }
-.pq-api {
-  margin-top:8px; font-size:0.79rem;
-  font-family:'JetBrains Mono','Fira Code',monospace;
-  background:#080c14; padding:4px 8px; border-radius:5px; color:#94a3b8;
-}
+
 .info-note {
   background:#0d1117; border:1px solid #21262d; border-radius:9px;
   padding:12px 18px; font-size:0.88rem; color:#475569; line-height:1.65; text-align:center;
+  margin-bottom: 40px;
 }
 .info-note strong { color:#94a3b8; }
 
@@ -191,14 +176,7 @@ code {
 .ins-text { font-size:0.87rem; color:#94a3b8; line-height:1.65; }
 .ins-text strong { color:#e2e8f0; }
 
-/* EXEC ORDER */
-.exec-order { background:#161b22; border:1px solid #21262d; border-radius:12px; padding:18px 22px; margin-top:14px; }
-.eo-title { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; margin-bottom:12px; }
-.eo-row { display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin-bottom:12px; }
-.eo-item { font-size:0.8rem; font-weight:600; padding:4px 9px; border-radius:6px; text-align:center; line-height:1.35; border:1px solid transparent; }
-.eo-arr { color:#2d3d50; font-size:0.9rem; }
-.eo-note { font-size:0.84rem; color:#475569; line-height:1.65; border-top:1px solid #21262d; padding-top:12px; }
-.eo-note strong { color:#94a3b8; }
+
 </style>
 </head>
 <body>
@@ -207,11 +185,16 @@ code {
 <!-- PAGE HEADER -->
 <div class="page-header">
   <h1>Node.js Event Loop</h1>
-  <p class="tagline">
-    <span class="method-pill">POST</span>
-    <span class="path-text">/request</span>
-    &nbsp;—&nbsp; A phase-by-phase walkthrough
-  </p>
+  <p class="page-question">Is Node.js single thread or not?</p>
+  <img src="it_depends.jpg" alt="It depends" class="header-img">
+
+  <div class="info-note">
+    <strong>One thread, never blocked.</strong>
+    JavaScript runs on a single thread, but all I/O (network, DB, disk) is delegated to
+    <strong>libuv</strong>, which uses a thread pool + OS async APIs.
+    When work completes, libuv re-enters Node.js through the Poll phase.
+    The JS thread stays free the entire time.
+  </div>
 </div>
 
 
@@ -299,45 +282,15 @@ code {
 
 </div>
 
-<div class="pq-row">
-  <div class="pq-card pq-tick">
-    <div class="pq-name">process.nextTick()</div>
-    <div class="pq-desc">
-      Not a phase — a priority queue. The entire queue is drained after <em>every
-      single callback</em>, before any Promise microtask and before the loop moves
-      to the next phase. Node.js internals (streams, EventEmitter) rely on this
-      for safe state transitions. Recursive calls can starve I/O.
-    </div>
-    <div class="pq-api">process.nextTick(fn)  →  before any .then()</div>
-  </div>
-  <div class="pq-card pq-prom">
-    <div class="pq-name">Promise Microtasks</div>
-    <div class="pq-desc">
-      Drains after <code>nextTick</code> but still before the loop advances.
-      The whole queue is emptied — if a microtask enqueues another, that one runs
-      too. Every resolved <code>await</code> or <code>.then()</code> lands here.
-      <code>fetch()</code> uses this queue for its resolution chain.
-    </div>
-    <div class="pq-api">Promise.resolve().then(fn) · async / await</div>
-  </div>
-</div>
-
-<div class="info-note">
-  <strong>One thread, never blocked.</strong>
-  JavaScript runs on a single thread, but all I/O (network, DB, disk) is delegated to
-  <strong>libuv</strong>, which uses a thread pool + OS async APIs.
-  When work completes, libuv re-enters Node.js through the Poll phase.
-  The JS thread stays free the entire time.
-</div>
-
 
 <!--=======================================================
     SECTION 2 — WHAT THE REQUEST DOES
 ========================================================-->
-<div class="sec-header">
+
+  <div class="sec-header">
   <div class="sec-num">2</div>
   <div class="sec-text">
-    <div class="sec-title">What POST /request Does</div>
+    <div class="sec-title">POST /request - A phase-by-phase walkthrough </div>
     <div class="sec-sub">Four operations — four different event loop destinations</div>
   </div>
   <div class="sec-line"></div>
@@ -811,55 +764,6 @@ server.<span class="cf">listen</span>(<span class="cn">3000</span>, () =&gt; {
 
 </div>
 
-
-<!-- EXECUTION ORDER -->
-<div class="exec-order">
-  <div class="eo-title">Callback firing order</div>
-  <div class="eo-row">
-    <div class="eo-item" style="background:#0d1828;color:#60a5fa;border-color:#1a304a">Poll C1<br>① console.log</div>
-    <span class="eo-arr">→</span>
-    <div class="eo-item" style="background:#13120e;color:#fbbf24;border-color:#2e1e06">Check C1<br>② setImmediate</div>
-    <span class="eo-arr">→</span>
-    <div class="eo-item" style="background:#150d04;color:#fb923c;border-color:#381a00">Timers C2<br>④ setTimeout</div>
-    <span class="eo-arr">→</span>
-    <div class="eo-item" style="background:#110d1e;color:#a78bfa;border-color:#261848">Poll C2<br>③ db.query cb</div>
-    <span class="eo-arr">→</span>
-    <div class="eo-item" style="background:#0d1a10;color:#34d399;border-color:#1a3828">Poll CN<br>fetch resolves</div>
-    <span class="eo-arr">→</span>
-    <div class="eo-item" style="background:#0c0c18;color:#9a7ab8;border:1px dashed #503890">μ await fetch<br>→ .json()</div>
-    <span class="eo-arr">→</span>
-    <div class="eo-item" style="background:#0c0c18;color:#22d3ee;border:1px dashed #304888">μ await .json()<br>→ await writeFile</div>
-    <span class="eo-arr">→</span>
-    <div class="eo-item" style="background:#0b1a1e;color:#22d3ee;border-color:#183540">Poll CN+1<br>writeFile resolves</div>
-    <span class="eo-arr">→</span>
-    <div class="eo-item" style="background:#0c0c18;color:#22d3ee;border:1px dashed #304888">μ await writeFile<br>log.txt saved ✓</div>
-  </div>
-  <div class="eo-note">
-    <strong>Why does setImmediate fire before setTimeout(0)?</strong>
-    Both are registered inside a Poll callback (an I/O cycle). <code>setImmediate</code>
-    targets the <strong>Check phase of the current cycle</strong> — Check runs immediately
-    after Poll. <code>setTimeout(0)</code> targets the <strong>Timers phase of the next
-    cycle</strong> — the loop must complete the current cycle first. Inside an I/O
-    callback, this order is deterministic.
-    <br><br>
-    <strong>Why does the DB callback fire in Cycle 2?</strong>
-    <code>db.query()</code> is async work handed to libuv. It finishes sometime after the
-    current Poll callback returns. If the result is ready by Cycle 2's Poll phase, it fires
-    there. If the DB is slower it fires in Cycle 3, 4, etc. — always in a
-    <strong>Poll phase</strong>.
-    <br><br>
-    <strong>Why does console.log('log.txt saved successfully') fire as a microtask?</strong>
-    <code>writeFile</code> is imported from <code>node:fs/promises</code> — it returns a
-    Promise, not a callback. When libuv completes the disk write, the Poll I/O event fires
-    and resolves the Promise. The <code>await writeFile()</code> continuation is then a
-    <strong>Promise microtask</strong> — it runs inside the microtask drain window triggered
-    by that Poll event, before any other I/O callback can execute.
-    This is in contrast to the legacy <code>fs.writeFile(fn, cb)</code> API, where the
-    completion callback would be a separate Poll event in its own loop iteration.
-  </div>
-</div>
-
-
 <!-- KEY INSIGHTS -->
 <div class="insights">
   <div class="ins-title">Key insights</div>
@@ -920,6 +824,20 @@ server.<span class="cf">listen</span>(<span class="cn">3000</span>, () =&gt; {
       <code>await response.json()</code> drain in Cycle N. After <code>writeFile</code>'s
       I/O event fires in Cycle N+1, <code>await writeFile()</code> drains as its own
       microtask — each step uninterrupted by any other I/O callback.
+    </div>
+  </div>
+
+  <div class="ins-row">
+    <div class="ins-dot" style="background:#9a7ab8"></div>
+    <div class="ins-text">
+      <strong>Why does console.log('log.txt saved successfully') fire as a microtask?</strong>
+      <code>writeFile</code> is imported from <code>node:fs/promises</code> — it returns a
+      Promise, not a callback. When libuv completes the disk write, the Poll I/O event fires
+      and resolves the Promise. The <code>await writeFile()</code> continuation is then a
+      <strong>Promise microtask</strong> — it runs inside the microtask drain window triggered
+      by that Poll event, before any other I/O callback can execute.
+      This is in contrast to the legacy <code>fs.writeFile(fn, cb)</code> API, where the
+      completion callback would be a separate Poll event in its own loop iteration.
     </div>
   </div>
 
