@@ -2,905 +2,930 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Node.js Event Loop</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POST /request — Node.js Event Loop</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  background: #0d1117; color: #e2e8f0;
-  padding: 36px 28px 60px;
-}
-h1 {
-  text-align: center; font-size: 1.6rem; color: #8a80b0;
-  letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px;
-}
-.subtitle { text-align: center; color: #475569; font-size: 1rem; margin-bottom: 40px; }
-
-/* ══ INTRO ══ */
-.intro {
-  max-width: 1100px; margin: 0 auto 48px;
-}
-.intro-title {
-  font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.12em;
-  color: #475569; margin-bottom: 20px; text-align: center;
-}
-.phases-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 10px; margin-bottom: 20px;
-}
-.phase-card {
-  border-radius: 10px; padding: 14px 16px;
-  border: 1px solid; border-left: 4px solid;
-}
-.phase-card .pc-num {
-  font-size: 0.78rem; font-weight: 900; text-transform: uppercase;
-  letter-spacing: 0.1em; margin-bottom: 5px; opacity: 0.9;
-}
-.phase-card .pc-name { font-weight: 700; font-size: 1rem; margin-bottom: 6px; }
-.phase-card .pc-desc { font-size: 0.88rem; color: #64748b; line-height: 1.55; }
-.phase-card .pc-example {
-  margin-top: 8px; font-size: 0.82rem; font-family: 'JetBrains Mono','Fira Code',monospace;
-  padding: 4px 8px; border-radius: 5px; background: #080c14; color: #94a3b8;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0d1117;
+  color: #e2e8f0;
+  padding: 44px 24px 100px;
 }
 
-.pc-timers  { background:#0e1512; border-color:#1a2a22; border-left-color:#6b9a7e; }
-.pc-timers .pc-name { color:#6b9a7e; }
-.pc-timers .pc-num  { color:#6b9a7e; }
-.pc-pending { background:#0e1512; border-color:#1a2a22; border-left-color:#7aab8f; }
-.pc-pending .pc-name { color:#7aab8f; }
-.pc-pending .pc-num  { color:#7aab8f; }
-.pc-idle    { background:#0a0f17; border-color:#1a2030; border-left-color:#334155; }
-.pc-idle .pc-name { color:#475569; }
-.pc-idle .pc-num  { color:#475569; }
-.pc-poll    { background:#11121d; border-color:#1e1e38; border-left-color:#7a82b8; }
-.pc-poll .pc-name { color:#7a82b8; }
-.pc-poll .pc-num  { color:#7a82b8; }
-.pc-check   { background:#13120e; border-color:#252015; border-left-color:#b0a05c; }
-.pc-check .pc-name { color:#b0a05c; }
-.pc-check .pc-num  { color:#b0a05c; }
-.pc-close   { background:#14100f; border-color:#2a1a18; border-left-color:#b07272; }
-.pc-close .pc-name { color:#b07272; }
-.pc-close .pc-num  { color:#b07272; }
+.page-wrap { max-width: 1060px; margin: 0 auto; }
 
-/* priority queues intro card */
-.pq-row {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 10px; margin-bottom: 10px;
+/* PAGE HEADER */
+.page-header { text-align: center; margin-bottom: 52px; }
+.page-header h1 {
+  font-size: 1.45rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #8a80b0; margin-bottom: 10px;
 }
-.pq-card {
-  border-radius: 10px; padding: 14px 16px;
-  border: 1px solid;
-}
-.pq-card .pq-name { font-weight: 700; font-size: 1rem; margin-bottom: 5px; }
-.pq-card .pq-desc { font-size: 0.88rem; color: #64748b; line-height: 1.55; }
-.pq-card .pq-example {
-  margin-top: 8px; font-size:0.82rem; font-family:'JetBrains Mono','Fira Code',monospace;
-  padding:4px 8px; border-radius:5px; background:#080c14; color:#94a3b8;
-}
-.pq-next { background:#12111d; border-color:#302550; }
-.pq-next .pq-name { color:#9a7ab8; }
-.pq-prom { background:#12111d; border-color:#282850; }
-.pq-prom .pq-name { color:#8a80b0; }
-
-.intro-note {
-  background:#0d1117; border:1px solid #1e2535; border-radius:9px;
-  padding:12px 16px; font-size:0.9rem; color:#64748b; line-height:1.6; text-align:center;
-}
-.intro-note strong { color:#94a3b8; }
-
-/* ══ DIVIDER ══ */
-.section-divider {
-  max-width: 1100px; margin: 0 auto 40px;
-  display: flex; align-items: center; gap: 16px;
-}
-.divider-line { flex: 1; height: 1px; background: #1e2535; }
-.divider-label {
-  font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.14em;
-  color: #334155; white-space: nowrap; padding: 4px 14px;
-  border: 1px solid #1e2535; border-radius: 20px; background: #0d1117;
-}
-
-/* ══ EXAMPLE INTRO ══ */
-.example-intro {
-  max-width: 1100px; margin: 0 auto 32px;
-}
-.example-intro-title {
-  font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.12em;
-  color: #475569; margin-bottom: 16px; text-align: center;
-}
-.endpoints-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 10px; margin-bottom: 16px;
-}
-.ep-card {
-  background: #161b22; border: 1px solid #21262d;
-  border-radius: 10px; padding: 14px 16px;
-}
-.ep-method {
-  font-size: 0.78rem; font-weight: 800; letter-spacing: 0.1em;
-  text-transform: uppercase; margin-bottom: 4px;
-}
-.ep-path {
+.page-header .tagline { display: inline-flex; align-items: center; gap: 10px; font-size: 1rem; color: #475569; }
+.method-pill {
+  background: #2d1200; color: #fb923c;
   font-family: 'JetBrains Mono','Fira Code',monospace;
-  font-size: 0.95rem; font-weight: 700; margin-bottom: 8px;
+  font-size: 0.85rem; font-weight: 800; padding: 3px 10px;
+  border-radius: 5px; border: 1px solid #5a2400;
 }
-.ep-desc { font-size:0.88rem; color:#64748b; line-height:1.5; }
-.ep-tag {
-  display:inline-block; margin-top:8px; font-size:0.78rem; font-weight:700;
-  padding:2px 7px; border-radius:4px;
-}
-.ep-get  { color:#5a9a85; }
-.ep-post { color:#b08050; }
-.ep-path-get  { color:#e2e8f0; }
-.ep-path-post { color:#b08050; }
-.tag-db     { background:#1e1e38; color:#7a82b8; }
-.tag-fetch  { background:#142520; color:#5a9a85; }
-.tag-stream { background:#2d1b00; color:#b08050; }
-
-/* ══ LAYOUT ══ */
-.main {
-  max-width: 1100px; margin: 0 auto;
-}
-.loop-col { display: flex; flex-direction: column; }
-
-/* cycle label */
-.cycle-label {
-  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em;
-  color: #334155; background: #0d1117; border: 1px solid #1e2535;
-  border-radius: 20px; padding: 3px 14px;
-  display: inline-block; align-self: center; margin: 8px 0;
-}
-.cycle-label.stream { border-color: #142520; color: #5a9a85; }
-.cycle-label.s3done { border-color: #3d1a00; color: #b08050; }
-
-/* micro strip */
-.micro-strip { display: flex; gap: 6px; margin-bottom: 14px; }
-.micro-lbl { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; color: #334155; text-align: center; margin-bottom: 5px; }
-.micro-chip { flex:1; border-radius:7px; padding:7px 10px; text-align:center; font-size:0.85rem; border:1px solid; line-height:1.4; }
-.mc-next { background:#12111d; border-color:#9a7ab8; color:#9a7ab8; }
-.mc-prom { background:#12111d; border-color:#8a80b0; color:#8a80b0; }
-.mc-sub  { font-size:0.75rem; color:#4b3f6b; display:block; margin-top:2px; }
-
-/* phase */
-.phase {
-  border-radius:9px; padding:10px 14px; margin-bottom:5px;
-  border:1px solid #1a2030; border-left:4px solid;
-}
-.phase.dimmed { opacity: 0.8; }
-.ph-name { font-weight:700; font-size:0.95rem; margin-bottom:3px; }
-.ph-desc { font-size:0.85rem; color:#4b5563; }
-.ph-events { margin-top:7px; display:flex; flex-direction:column; gap:4px; }
-
-.arrow { text-align:center; color:#1e2d3d; font-size:1rem; margin:1px 0; line-height:1; }
-
-/* phase themes */
-.ph-timers  { border-left-color:#6b9a7e; background:#0e1512; }
-.ph-timers .ph-name { color:#6b9a7e; }
-.ph-pending { border-left-color:#7aab8f; background:#0e1512; }
-.ph-pending .ph-name { color:#7aab8f; }
-.ph-idle    { border-left-color:#1e2d3d; background:#0a0f17; }
-.ph-idle .ph-name { color:#2a3d52; }
-.ph-poll    { border-left-color:#7a82b8; background:#11121d; }
-.ph-poll .ph-name { color:#7a82b8; }
-.ph-check   { border-left-color:#b0a05c; background:#13120e; }
-.ph-check .ph-name { color:#b0a05c; }
-.ph-close   { border-left-color:#b07272; background:#14100f; }
-.ph-close .ph-name { color:#b07272; }
-.ph-close.active { border-left-color:#b08050; background:#1a0f00; border-color:#3d1a00; }
-.ph-close.active .ph-name { color:#b08050; }
-
-/* event pill */
-.ev {
-  display:flex; align-items:flex-start; gap:7px;
-  font-size:0.85rem; padding:5px 9px; border-radius:6px; line-height:1.4;
-}
-.ev-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:3px; }
-.ev strong { color:#f0f4ff; }
-.ev em { color:#64748b; font-style:normal; }
-
-.ev-empty  { background:#0d1117; color:#2d3d50; }
-.ev-req1   { background:#12111d; color:#7a82b8; border:1px solid #252048; }
-.ev-req1b  { background:#151030; color:#8a80b0; border:1px solid #282850; }
-.ev-req2a  { background:#0e1814; color:#5a9a85; border:1px solid #142520; }
-.ev-req2b  { background:#0e1512; color:#6aab8f; border:1px solid #1a3530; }
-.ev-upload { background:#141008; color:#b08050; border:1px solid #4a2010; }
-.ev-timer  { background:#141008; color:#b09050; border:1px solid #352010; }
-.ev-imm    { background:#131008; color:#b0a05c; border:1px solid #352510; }
-.ev-db1    { background:#161520; color:#8088a8; border:1px solid #282850; }
-.ev-db2    { background:#161520; color:#9088b0; border:1px solid #382870; }
-.ev-mA     { background:#151030; color:#9a7ab8; border:1px dashed #503890; }
-.ev-mB     { background:#141028; color:#8a80b0; border:1px dashed #453080; }
-.ev-chunk  { background:#0e1815; color:#6aab8f; border:1px solid #1a3530; }
-.ev-s3done { background:#151008; color:#b08050; border:1px solid #4a2010; }
-.ev-close  { background:#141008; color:#b08888; border:1px solid #4a1818; }
-.ev-end    { background:#0d2010; color:#5a9a85; border:1px solid #1a3530; }
-
-/* queue snapshot */
-.queue-wrap {
-  margin:8px 0 4px; border:1px solid #1e2535; border-radius:8px;
-  padding:8px 10px; background:#080c14;
-}
-.queue-title { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.1em; color:#334155; margin-bottom:6px; }
-.queue-row { display:flex; align-items:center; gap:5px; font-size:0.85rem; margin-bottom:3px; flex-wrap:wrap; }
-.q-item { padding:3px 9px; border-radius:5px; font-weight:600; font-size:0.82rem; }
-.q-arrow { color:#2d3d50; }
-.q-note { font-size:0.78rem; color:#334155; margin-left:4px; }
-
-/* exec steps */
-.exec-steps { margin-top:8px; display:flex; flex-direction:column; gap:2px; }
-.exec-step {
-  display:flex; align-items:flex-start; gap:8px;
-  padding:5px 8px; border-radius:6px; font-size:0.85rem; line-height:1.4;
-}
-.exec-num {
-  width:20px; height:20px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-size:0.75rem; font-weight:800; flex-shrink:0;
+.path-text {
+  font-family: 'JetBrains Mono','Fira Code',monospace;
+  font-size: 1rem; font-weight: 700; color: #e2e8f0;
 }
 
-.step-db1  { background:#161520; color:#8088a8; }
-.step-mA   { background:#151228; color:#9a7ab8; border:1px dashed #503890; }
-.step-mB   { background:#131020; color:#8a80b0; border:1px dashed #453080; }
-.step-db2  { background:#161520; color:#9088b0; }
-.step-chunk{ background:#0d1f18; color:#6aab8f; }
+/* SECTION HEADERS */
+.sec-header { display: flex; align-items: flex-start; gap: 16px; margin: 52px 0 26px; }
+.sec-num {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: #161b22; border: 1px solid #30363d;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9rem; font-weight: 800; color: #8a80b0; flex-shrink: 0;
+}
+.sec-text .sec-title { font-size: 1.05rem; font-weight: 700; color: #e2e8f0; margin-bottom: 3px; }
+.sec-text .sec-sub { font-size: 0.85rem; color: #475569; }
+.sec-line { flex: 1; height: 1px; background: #21262d; margin-top: 17px; }
 
-.en-db1  { background:#282850; color:#e0e7ff; }
-.en-mA   { background:#503890; color:#f5f3ff; }
-.en-mB   { background:#453080; color:#ede9fe; }
-.en-db2  { background:#382870; color:#ede9fe; }
-.en-chunk{ background:#1a3530; color:#d1fae5; }
+/* PHASE CARDS */
+.phases-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.phase-card { border-radius: 10px; padding: 15px 16px; border: 1px solid; border-left: 4px solid; }
+.pc-num { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+.pc-name { font-size: 0.97rem; font-weight: 700; margin-bottom: 7px; }
+.pc-desc { font-size: 0.84rem; color: #64748b; line-height: 1.6; }
+.pc-api {
+  margin-top: 9px; font-size: 0.79rem;
+  font-family: 'JetBrains Mono','Fira Code',monospace;
+  background: #080c14; padding: 4px 8px; border-radius: 5px; color: #94a3b8;
+}
+.ph1 { background:#0e1512; border-color:#1a2a22; border-left-color:#6b9a7e; }
+.ph1 .pc-num,.ph1 .pc-name { color:#6b9a7e; }
+.ph2 { background:#0e1512; border-color:#1a2a22; border-left-color:#7aab8f; }
+.ph2 .pc-num,.ph2 .pc-name { color:#7aab8f; }
+.ph3 { background:#0a0f17; border-color:#1a2030; border-left-color:#334155; }
+.ph3 .pc-num,.ph3 .pc-name { color:#475569; }
+.ph4 { background:#11121d; border-color:#1e1e38; border-left-color:#7a82b8; }
+.ph4 .pc-num,.ph4 .pc-name { color:#7a82b8; }
+.ph5 { background:#13120e; border-color:#252015; border-left-color:#b0a05c; }
+.ph5 .pc-num,.ph5 .pc-name { color:#b0a05c; }
+.ph6 { background:#14100f; border-color:#2a1a18; border-left-color:#b07272; }
+.ph6 .pc-num,.ph6 .pc-name { color:#b07272; }
 
-/* microtask separator */
-.micro-sep {
-  text-align:center; font-size:0.78rem; color:#503890;
-  letter-spacing:0.08em; text-transform:uppercase; margin:2px 0;
-  padding:2px 0; border-top:1px dashed #1e1048; border-bottom:1px dashed #1e1048;
+/* priority queues */
+.pq-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.pq-card { background:#12111d; border:1px solid #1e1048; border-left:4px solid; border-radius:10px; padding:14px 16px; }
+.pq-tick { border-left-color:#9a7ab8; }
+.pq-tick .pq-name { color:#9a7ab8; }
+.pq-prom { border-left-color:#8a80b0; }
+.pq-prom .pq-name { color:#8a80b0; }
+.pq-name { font-size:0.95rem; font-weight:700; margin-bottom:6px; }
+.pq-desc { font-size:0.84rem; color:#64748b; line-height:1.6; }
+.pq-api {
+  margin-top:8px; font-size:0.79rem;
+  font-family:'JetBrains Mono','Fira Code',monospace;
+  background:#080c14; padding:4px 8px; border-radius:5px; color:#94a3b8;
 }
-.micro-sep.empty { color:#1e2535; border-color:#1e2535; }
+.info-note {
+  background:#0d1117; border:1px solid #21262d; border-radius:9px;
+  padding:12px 18px; font-size:0.88rem; color:#475569; line-height:1.65; text-align:center;
+}
+.info-note strong { color:#94a3b8; }
 
-/* chunk repeat */
-.chunk-repeat {
-  background:#0e1512; border:1px dashed #1a3530; border-radius:8px;
-  padding:8px 12px; margin:4px 0; font-size:0.85rem; color:#5a9a85;
-  display:flex; align-items:flex-start; gap:8px;
+/* CODE BLOCK */
+.code-wrap {
+  background:#080c14; border:1px solid #21262d;
+  border-radius:12px; padding:22px 26px; margin-bottom:18px; overflow-x:auto;
 }
-
-/* ══ SIDE LANES ══ */
-.lanes-col { display:flex; flex-direction:column; gap:12px; }
-.lane { background:#161b22; border:1px solid #21262d; border-radius:10px; padding:14px; }
-.lane-title { font-size:0.82rem; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:10px; padding-bottom:7px; border-bottom:1px solid #21262d; }
-.lane-client .lane-title { color:#5a90b0; }
-.lane-libuv  .lane-title { color:#b08a40; }
-.lane-stream .lane-title { color:#5a9a85; }
-
-.lane-row { display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; font-size:0.88rem; line-height:1.45; }
-.lane-step {
-  width:22px; height:22px; border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-size:0.75rem; font-weight:800; flex-shrink:0; margin-top:1px;
-}
-.s-v1 { background:#252558; color:#7a82b8; }
-.s-v2 { background:#1e1e38; color:#8a80b0; }
-.s-g1 { background:#1a3530; color:#5a9a85; }
-.s-g2 { background:#122520; color:#6aab8f; }
-.s-up { background:#381208; color:#b08050; }
-.s-i1 { background:#1e1e38; color:#8088a8; }
-.s-i2 { background:#151028; color:#9088b0; }
-.s-mA { background:#1e1048; color:#9a7ab8; }
-.s-mB { background:#1e0e40; color:#8a80b0; }
-.s-s3 { background:#381208; color:#b08050; }
-.s-cl { background:#4a1818; color:#b08888; }
-.s-ch { background:#1a3530; color:#6aab8f; }
-
-.lane-text { color:#94a3b8; }
-.lane-text strong { color:#e2e8f0; }
-.phase-ref { display:inline-block; font-size:0.75rem; font-weight:700; padding:1px 5px; border-radius:4px; margin-left:3px; vertical-align:middle; }
-.ref-poll   { background:#1e1e38; color:#7a82b8; }
-.ref-check  { background:#1c1400; color:#b0a05c; }
-.ref-timers { background:#052e16; color:#6b9a7e; }
-.ref-micro  { background:#1e1048; color:#9a7ab8; }
-.ref-close  { background:#450a0a; color:#b08888; }
-.lane-sep { height:1px; background:#21262d; margin:6px 0; }
-
-/* stream lifecycle */
-.stream-lifecycle {
-  background:#080c14; border:1px solid #142520; border-radius:7px;
-  padding:8px 10px; font-size:0.82rem; line-height:1.8;
-}
-.slc-row { display:flex; align-items:center; gap:6px; color:#4b5563; }
-.slc-row .dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-.slc-row strong { color:#94a3b8; }
-
-/* ══ ORDER STRIP ══ */
-.order-strip {
-  max-width:1100px; margin:20px auto 0;
-  background:#161b22; border:1px solid #21262d; border-radius:10px; padding:14px 18px;
-}
-.order-title { font-size:0.82rem; text-transform:uppercase; letter-spacing:0.1em; color:#475569; margin-bottom:10px; }
-.order-items { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-bottom:14px; }
-.oi { font-size:0.85rem; font-weight:600; padding:4px 9px; border-radius:6px; text-align:center; line-height:1.4; }
-.oi-arrow { color:#2d3d50; font-size:1.1rem; }
-.oi-dots  { color:#334155; font-size:1rem; letter-spacing:2px; }
-.order-note { font-size:0.85rem; color:#475569; line-height:1.65; border-top:1px solid #1e2535; padding-top:10px; }
-.order-note strong { color:#94a3b8; }
-.hl-purple { color:#9a7ab8; font-weight:600; }
-.hl-orange { color:#b08050; font-weight:600; }
-.hl-red    { color:#b08888; font-weight:600; }
-.hl-green  { color:#5a9a85; font-weight:600; }
-
-/* ══ HORIZONTAL TIMELINE ══ */
-.timeline-wrap {
-  max-width:1100px; margin:32px auto;
-  background:#161b22; border:1px solid #21262d; border-radius:10px; padding:20px 24px;
-}
-.tl-title {
-  font-size:0.82rem; text-transform:uppercase; letter-spacing:0.1em;
-  color:#475569; margin-bottom:18px;
-}
-.tl-cycle {
-  display:flex; align-items:flex-start; gap:14px; margin-bottom:12px;
-}
-.tl-cycle-lbl {
-  font-size:0.72rem; font-weight:700; color:#334155; text-transform:uppercase;
-  letter-spacing:0.08em; white-space:nowrap; min-width:90px; padding-top:8px;
-}
-.tl-events {
-  display:flex; align-items:center; flex-wrap:wrap; gap:5px;
-}
-.tl-event { display:flex; flex-direction:column; align-items:center; gap:3px; }
-.tl-badge {
-  font-size:0.65rem; font-weight:700; padding:1px 6px; border-radius:3px;
-  text-align:center; white-space:nowrap;
-}
-.tl-chip {
-  font-size:0.8rem; font-weight:600; padding:5px 10px; border-radius:6px;
-  white-space:nowrap; border:1px solid transparent;
-}
-.tl-arr { color:#2d3d50; font-size:1rem; padding-top:20px; }
-.tl-micro-group {
-  display:flex; flex-direction:column; align-items:center; gap:4px;
-  border:1px dashed #503890; border-radius:8px; padding:6px 10px;
-  background:#0e0e14;
-}
-.tl-micro-lbl {
-  font-size:0.65rem; color:#503890; text-transform:uppercase;
-  letter-spacing:0.08em; margin-bottom:2px;
-}
-.tl-micro-row { display:flex; gap:5px; align-items:center; }
-.tl-sep { height:1px; background:#21262d; margin:6px 0; }
-.tl-repeat {
+.code-top {
   display:flex; align-items:center; gap:10px;
-  background:#0e1512; border:1px dashed #1a3530; border-radius:7px;
-  padding:6px 12px; font-size:0.82rem; color:#5a9a85;
+  margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #1e2535;
+}
+.code-dots { display:flex; gap:6px; }
+.code-dot { width:10px; height:10px; border-radius:50%; }
+.code-filename { font-size:0.8rem; color:#475569; font-family:'JetBrains Mono','Fira Code',monospace; }
+pre {
+  font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+  font-size:0.87rem; line-height:1.85; white-space:pre; color:#8896a8;
+}
+.ck  { color:#c792ea; }
+.cs  { color:#c3e88d; }
+.cn  { color:#f78c6c; }
+.cm  { color:#546e7a; font-style:italic; }
+.cf  { color:#82aaff; }
+.cc  { color:#ffcb6b; }
+.op1 { color:#60a5fa; font-weight:700; }
+.op2 { color:#fbbf24; font-weight:700; }
+.op3 { color:#a78bfa; font-weight:700; }
+.op4 { color:#fb923c; font-weight:700; }
+.op4a{ color:#34d399; font-weight:700; }
+.op4b{ color:#22d3ee; font-weight:700; }
+
+/* CYCLE CARDS */
+.cycle-col { display:flex; flex-direction:column; gap:5px; }
+.cycle-card { background:#161b22; border:1px solid #21262d; border-radius:12px; padding:18px 20px; }
+.cycle-head { display:flex; align-items:flex-start; gap:14px; margin-bottom:16px; }
+.cycle-badge { background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:6px 14px; text-align:center; flex-shrink:0; }
+.cycle-badge .cb-lbl { font-size:0.62rem; text-transform:uppercase; letter-spacing:0.1em; color:#334155; }
+.cycle-badge .cb-num { font-size:1.15rem; font-weight:800; color:#475569; }
+.cycle-info .ci-title { font-size:0.93rem; font-weight:700; color:#94a3b8; margin-bottom:4px; }
+.cycle-info .ci-sub { font-size:0.83rem; color:#475569; line-height:1.55; }
+.phase-rows { display:flex; flex-direction:column; gap:5px; }
+.phase-row { display:flex; align-items:flex-start; gap:10px; padding:8px 12px; border-radius:8px; border-left:3px solid; }
+.phase-row.dim { opacity:0.7; }
+.pr-label { font-size:0.7rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; white-space:nowrap; min-width:68px; padding-top:2px; }
+.pr-body { flex:1; }
+.pr-empty { font-size:0.82rem; color:#2d3d50; }
+.pr-timers  { background:#0e1512; border-left-color:#6b9a7e; }
+.pr-timers .pr-label  { color:#6b9a7e; }
+.pr-pending { background:#0e1512; border-left-color:#7aab8f; }
+.pr-pending .pr-label { color:#7aab8f; }
+.pr-idle    { background:#0a0f17; border-left-color:#1e2d3d; }
+.pr-idle .pr-label    { color:#2a3d52; }
+.pr-poll    { background:#11121d; border-left-color:#7a82b8; }
+.pr-poll .pr-label    { color:#7a82b8; }
+.pr-check   { background:#13120e; border-left-color:#b0a05c; }
+.pr-check .pr-label   { color:#b0a05c; }
+.pr-close   { background:#14100f; border-left-color:#b07272; }
+.pr-close .pr-label   { color:#b07272; }
+
+.ev-list { display:flex; flex-direction:column; gap:1px; }
+.ev { display:flex; align-items:flex-start; gap:8px; font-size:0.84rem; padding:5px 0; line-height:1.55; border-top:1px solid transparent; }
+.ev + .ev { border-top-color:#1e2535; }
+.ev-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.ev strong { color:#e2e8f0; }
+code {
+  font-family:'JetBrains Mono','Fira Code',monospace;
+  font-size:0.82em; background:#161b22; padding:1px 5px; border-radius:3px;
 }
 
-/* ══ WHERE EACH OP LANDS ══ */
-.ops-grid {
-  max-width:1100px; margin:24px auto;
-  background:#161b22; border:1px solid #21262d; border-radius:10px; padding:18px 24px;
-}
-.ops-title {
-  font-size:0.82rem; text-transform:uppercase; letter-spacing:0.1em;
-  color:#475569; margin-bottom:14px;
-}
-.ops-items { display:flex; flex-wrap:wrap; gap:8px; }
-.ops-item {
-  display:flex; align-items:center; gap:8px;
-  background:#0d1117; border:1px solid #1e2535; border-radius:7px; padding:8px 14px;
-}
-.ops-label { font-size:0.85rem; font-weight:600; }
-.ops-dest { font-size:0.82rem; color:#475569; }
+/* microtask box */
+.mu-box { margin:5px 0; padding:8px 12px; background:#0c0c18; border:1px dashed #503890; border-radius:8px; }
+.mu-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; color:#5a3a98; margin-bottom:6px; font-weight:700; }
+.mu-ev { display:flex; align-items:flex-start; gap:8px; font-size:0.84rem; padding:4px 0; line-height:1.55; color:#8896a8; border-top:1px solid transparent; }
+.mu-ev + .mu-ev { border-top-color:#1e1048; }
+
+.cycle-arrow { text-align:center; color:#1e2d3d; font-size:1.4rem; margin:1px 0; }
+.cycle-gap { background:#0d1117; border:1px dashed #21262d; border-radius:10px; padding:13px 18px; text-align:center; }
+.cycle-gap .cg-text { font-size:0.88rem; color:#334155; margin-bottom:3px; }
+.cycle-gap .cg-sub { font-size:0.8rem; color:#1e2d3d; }
+
+/* TIMELINE */
+.timeline { background:#161b22; border:1px solid #21262d; border-radius:12px; padding:22px 24px; margin-top:32px; }
+.tl-title { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; margin-bottom:18px; }
+.tl-row { display:flex; align-items:flex-end; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+.tl-cl { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#334155; min-width:56px; text-align:right; padding-bottom:7px; }
+.tl-item { display:flex; flex-direction:column; align-items:center; gap:3px; }
+.tl-badge { font-size:0.63rem; font-weight:700; padding:1px 5px; border-radius:3px; text-align:center; }
+.tl-chip { font-size:0.8rem; font-weight:600; padding:5px 9px; border-radius:6px; border:1px solid transparent; text-align:center; white-space:nowrap; line-height:1.35; }
+.tl-arr { color:#1e2d3d; font-size:0.9rem; padding-bottom:7px; }
+.tl-sep { width:100%; height:1px; background:#21262d; margin:6px 0; }
+.tl-mu { display:flex; flex-direction:column; align-items:center; border:1px dashed #503890; border-radius:8px; padding:6px 10px; background:#0c0c18; gap:4px; }
+.tl-mu-lbl { font-size:0.62rem; color:#5a3a98; text-transform:uppercase; letter-spacing:0.08em; }
+.tl-mu-row { display:flex; gap:5px; align-items:center; }
+
+/* INSIGHTS */
+.insights { background:#0d1117; border:1px solid #21262d; border-radius:12px; padding:20px 24px; margin-top:14px; }
+.ins-title { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; margin-bottom:16px; }
+.ins-row { display:flex; align-items:flex-start; gap:10px; margin-bottom:12px; }
+.ins-row:last-child { margin-bottom:0; }
+.ins-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+.ins-text { font-size:0.87rem; color:#94a3b8; line-height:1.65; }
+.ins-text strong { color:#e2e8f0; }
+
+/* EXEC ORDER */
+.exec-order { background:#161b22; border:1px solid #21262d; border-radius:12px; padding:18px 22px; margin-top:14px; }
+.eo-title { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.12em; color:#475569; margin-bottom:12px; }
+.eo-row { display:flex; align-items:center; flex-wrap:wrap; gap:5px; margin-bottom:12px; }
+.eo-item { font-size:0.8rem; font-weight:600; padding:4px 9px; border-radius:6px; text-align:center; line-height:1.35; border:1px solid transparent; }
+.eo-arr { color:#2d3d50; font-size:0.9rem; }
+.eo-note { font-size:0.84rem; color:#475569; line-height:1.65; border-top:1px solid #21262d; padding-top:12px; }
+.eo-note strong { color:#94a3b8; }
 </style>
 </head>
 <body>
+<div class="page-wrap">
 
-<h1>Node.js Event Loop</h1>
-<p class="subtitle">A visual guide to how Node.js handles asynchronous operations</p>
-
-<!-- ══ INTRO ══ -->
-<div class="intro">
-  <div class="intro-title">The 6 phases — executed in order on every cycle</div>
-
-  <div class="phases-grid">
-
-    <div class="phase-card pc-timers">
-      <div class="pc-num">Phase 1</div>
-      <div class="pc-name">Timers</div>
-      <div class="pc-desc">Runs callbacks scheduled by <code style="background:#080c14;padding:1px 4px;border-radius:3px">setTimeout()</code> and <code style="background:#080c14;padding:1px 4px;border-radius:3px">setInterval()</code> whose delay has expired. The delay is a <em>minimum</em> wait, not a guarantee — if the loop is busy, the callback fires late.</div>
-      <div class="pc-example">setTimeout(fn, 0) → fires here</div>
-    </div>
-
-    <div class="phase-card pc-pending">
-      <div class="pc-num">Phase 2</div>
-      <div class="pc-name">Pending callbacks</div>
-      <div class="pc-desc">Executes I/O callbacks that were deliberately deferred by the previous cycle. The most common case is TCP-level errors such as <code style="background:#080c14;padding:1px 4px;border-radius:3px">ECONNREFUSED</code>. Rarely touched in application code.</div>
-      <div class="pc-example">TCP ECONNREFUSED → deferred here</div>
-    </div>
-
-    <div class="phase-card pc-idle">
-      <div class="pc-num">Phase 3</div>
-      <div class="pc-name">Idle / Prepare</div>
-      <div class="pc-desc">Internal use only. Node.js uses this phase to prepare for the upcoming Poll phase. Not accessible from userland JavaScript — you will never schedule anything here directly.</div>
-      <div class="pc-example">— internal to Node.js —</div>
-    </div>
-
-    <div class="phase-card pc-poll">
-      <div class="pc-num">Phase 4</div>
-      <div class="pc-name">Poll</div>
-      <div class="pc-desc">The most important phase. Retrieves new I/O events and executes their callbacks — HTTP requests, DB results, file reads, network responses. If the queue is empty and no timers are pending, the loop <em>blocks here</em> waiting for new events.</div>
-      <div class="pc-example">HTTP, DB, fetch, stream data → all here</div>
-    </div>
-
-    <div class="phase-card pc-check">
-      <div class="pc-num">Phase 5</div>
-      <div class="pc-name">Check</div>
-      <div class="pc-desc">Runs callbacks registered with <code style="background:#080c14;padding:1px 4px;border-radius:3px">setImmediate()</code>. Always executes right after Poll in the same cycle — this makes it reliably earlier than <code style="background:#080c14;padding:1px 4px;border-radius:3px">setTimeout(fn, 0)</code> when called inside an I/O handler.</div>
-      <div class="pc-example">setImmediate(fn) → fires here</div>
-    </div>
-
-    <div class="phase-card pc-close">
-      <div class="pc-num">Phase 6</div>
-      <div class="pc-name">Close callbacks</div>
-      <div class="pc-desc">Handles <code style="background:#080c14;padding:1px 4px;border-radius:3px">close</code> events for sockets and streams that were destroyed abruptly. Runs last so all pending I/O for that resource has already been processed. This is where stream cleanup lands.</div>
-      <div class="pc-example">socket / stream 'close' event → fires here</div>
-    </div>
-
-  </div>
-
-  <!-- Priority queues -->
-  <div class="intro-title" style="margin-top:24px;">Priority queues — run between every phase (and between every callback)</div>
-  <div class="pq-row">
-    <div class="pq-card pq-next">
-      <div class="pq-name">process.nextTick()</div>
-      <div class="pq-desc">Highest priority of all. The entire nextTick queue is drained after every single callback, before any Promise microtask and before the loop advances to the next phase. Used by Node.js internals (EventEmitter, streams) to defer state transitions safely.</div>
-      <div class="pq-example">process.nextTick(fn) → before any .then()</div>
-    </div>
-    <div class="pq-card pq-prom">
-      <div class="pq-name">Promise microtasks</div>
-      <div class="pq-desc">Runs after nextTick, but still before the loop moves on. The entire queue is drained — not just one item. If a <code style="background:#080c14;padding:1px 4px;border-radius:3px">.then()</code> enqueues another <code style="background:#080c14;padding:1px 4px;border-radius:3px">.then()</code>, that runs too. A deep Promise chain can therefore starve the I/O queue.</div>
-      <div class="pq-example">Promise.resolve().then(fn) · async/await</div>
-    </div>
-  </div>
-
-  <div class="intro-note">
-    <strong>One thread, non-blocking.</strong>
-    JavaScript runs on a single thread — but I/O (disk, network, DB) is delegated to <strong>libuv</strong>, which uses a thread pool and the OS async I/O APIs.
-    When the work is done, the callback re-enters the loop through the Poll phase.
-    The main thread is free the entire time.
-  </div>
-</div>
-
-<!-- ══ DIVIDER ══ -->
-<div class="section-divider">
-  <div class="divider-line"></div>
-  <div class="divider-label">Worked example</div>
-  <div class="divider-line"></div>
-</div>
-
-<!-- ══ EXAMPLE INTRO ══ -->
-<div class="example-intro">
-  <div class="example-intro-title">Five concurrent requests — what happens inside the loop</div>
-  <div class="endpoints-grid">
-
-    <div class="ep-card">
-      <div class="ep-method ep-get">GET</div>
-      <div class="ep-path ep-path-get">/users</div>
-      <div class="ep-desc">Two parallel requests. Each queries the database via <code style="background:#0d1117;padding:1px 4px;border-radius:3px;font-size:0.65rem">db.query()</code>, which is delegated to the libuv thread pool. Both DB results arrive in the same tick and are processed as I/O callbacks in Poll.</div>
-      <span class="ep-tag tag-db">libuv thread pool</span>
-    </div>
-
-    <div class="ep-card">
-      <div class="ep-method ep-get">GET</div>
-      <div class="ep-path ep-path-get">/externalUsers</div>
-      <div class="ep-desc">Two parallel requests. Each calls an external API via <code style="background:#0d1117;padding:1px 4px;border-radius:3px;font-size:0.65rem">fetch()</code>. When the OS signals a response, the Promise resolves and the <code style="background:#0d1117;padding:1px 4px;border-radius:3px;font-size:0.65rem">.then()</code> lands in the microtask queue — not the I/O queue.</div>
-      <span class="ep-tag tag-fetch">OS network I/O → microtask</span>
-    </div>
-
-    <div class="ep-card">
-      <div class="ep-method ep-post">POST</div>
-      <div class="ep-path ep-path-post">/uploadReport</div>
-      <div class="ep-desc">Pipes the request body as a Readable stream directly into an S3 upload. Each file chunk fires a <code style="background:#0d1117;padding:1px 4px;border-radius:3px;font-size:0.65rem">data</code> event in Poll. When the upload completes, the stream is destroyed and its <code style="background:#0d1117;padding:1px 4px;border-radius:3px;font-size:0.65rem">close</code> event fires in phase 6.</div>
-      <span class="ep-tag tag-stream">stream → Poll · close → phase 6</span>
-    </div>
-
-  </div>
-
-  <div class="intro-note" style="font-size:0.7rem; text-align:left; padding: 12px 18px;">
-    The handler for <strong>GET /users (A)</strong> also registers a <code style="background:#161b22;padding:1px 5px;border-radius:3px">setTimeout(fn, 0)</code> and a <code style="background:#161b22;padding:1px 5px;border-radius:3px">setImmediate(fn)</code> to demonstrate the ordering difference between the two.
-    All five requests arrive simultaneously and all async results are assumed to land in the same tick for clarity.
-  </div>
-</div>
-
-<!-- loop subtitle -->
-<p style="text-align:center; color:#334155; font-size:0.88rem; margin-bottom:24px; text-transform:uppercase; letter-spacing:0.1em;">Event loop — cycle by cycle</p>
-
-<div class="main">
-  <!-- ════ LOOP ════ -->
-  <div class="loop-col">
-
-    <div class="micro-lbl">Priority queues — drained completely after every single callback</div>
-    <div class="micro-strip">
-      <div class="micro-chip mc-next"><strong>process.nextTick()</strong><span class="mc-sub">absolute top priority</span></div>
-      <div class="micro-chip mc-prom"><strong>Promise microtasks</strong><span class="mc-sub">.then() / async-await — used by fetch()</span></div>
-    </div>
-
-    <!-- ══ CYCLE 1 ══ -->
-    <div class="cycle-label">Cycle 1 — all requests arrive</div>
-
-    <div class="phase ph-timers dimmed"><div class="ph-name">Timers</div><div class="ph-desc">Expired setTimeout / setInterval callbacks</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>No timers registered yet</div></div></div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-pending dimmed"><div class="ph-name">Pending callbacks</div><div class="ph-desc">I/O callbacks deferred from previous cycle</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>Queue empty</div></div></div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-idle dimmed"><div class="ph-name">Idle / Prepare</div><div class="ph-desc">Internal Node.js use only</div></div>
-    <div class="arrow">↓</div>
-
-    <div class="phase ph-poll">
-            <div class="ph-name">Poll</div>
-      <div class="ph-desc">All five requests arrive here as incoming I/O events</div>
-      <div class="ph-events">
-        <div class="ev ev-req1"><div class="ev-dot" style="background:#7a82b8"></div><div><strong>GET /users (A)</strong> — handler runs: setTimeout registered · setImmediate registered · <em>db.query() → libuv thread pool</em></div></div>
-        <div class="ev ev-req1b"><div class="ev-dot" style="background:#8a80b0"></div><div><strong>GET /users (B)</strong> — handler runs: <em>db.query() → libuv (second worker)</em></div></div>
-        <div class="ev ev-req2a"><div class="ev-dot" style="background:#5a9a85"></div><div><strong>GET /externalUsers (A)</strong> — handler runs: <em>fetch() → OS async network I/O</em></div></div>
-        <div class="ev ev-req2b"><div class="ev-dot" style="background:#6aab8f"></div><div><strong>GET /externalUsers (B)</strong> — handler runs: <em>fetch() → OS async network I/O</em></div></div>
-        <div class="ev ev-upload"><div class="ev-dot" style="background:#b08050"></div><div><strong>POST /uploadReport</strong> — handler runs: <em>req.pipe(s3PassThrough) sets up the pipeline · S3 upload delegated to OS</em></div></div>
-      </div>
-    </div>
-    <div class="arrow">↓</div>
-
-    <div class="phase ph-check"><div class="ph-name">Check</div><div class="ph-desc">setImmediate() callbacks</div><div class="ph-events"><div class="ev ev-imm"><div class="ev-dot" style="background:#b0a05c"></div><strong>setImmediate</strong> — fires in the same cycle, right after Poll</div></div></div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-close dimmed"><div class="ph-name">Close callbacks</div><div class="ph-desc">socket.on('close', …)</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>Stream still open — nothing here yet</div></div></div>
-
-    <!-- ══ CYCLE 2 ══ -->
-    <div class="cycle-label">Cycle 2 — DB ×2, external APIs ×2, first S3 chunk all arrive in the same tick</div>
-
-    <div class="phase ph-timers"><div class="ph-name">Timers</div><div class="ph-events"><div class="ev ev-timer"><div class="ev-dot" style="background:#b09050"></div><strong>setTimeout(0)</strong> — timer expired, callback runs</div></div></div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-pending dimmed"><div class="ph-name">Pending callbacks</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>Queue empty</div></div></div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-idle dimmed"><div class="ph-name">Idle / Prepare</div></div>
-    <div class="arrow">↓</div>
-
-    <div class="phase ph-poll" style="border-color:#282850">
-            <div class="ph-name">Poll — the key moment: 2 microtasks between 2 I/O callbacks</div>
-      <div class="ph-desc">After every single I/O callback, the entire microtask queue is drained before moving on</div>
-
-      <div class="queue-wrap">
-        <div class="queue-title">Queue state at the start of this Poll phase</div>
-        <div class="queue-row">
-          <span style="font-size:0.8rem;color:#475569;width:90px;flex-shrink:0">I/O queue</span>
-          <div class="q-item" style="background:#161520;color:#8088a8">DB cb A</div>
-          <span class="q-arrow">→</span>
-          <div class="q-item" style="background:#161520;color:#9088b0">DB cb B</div>
-          <span class="q-arrow">→</span>
-          <div class="q-item" style="background:#141008;color:#b08050">data chunk #1</div>
-        </div>
-        <div class="queue-row" style="margin-top:3px">
-          <span style="font-size:0.8rem;color:#475569;width:90px;flex-shrink:0">microtasks</span>
-          <div class="q-item" style="background:#151030;color:#9a7ab8">fetch .then() A</div>
-          <span class="q-arrow">→</span>
-          <div class="q-item" style="background:#141028;color:#8a80b0">fetch .then() B</div>
-          <span class="q-note">← both drain after DB cb A</span>
-        </div>
-      </div>
-
-      <div class="exec-steps">
-
-        <div class="exec-step step-db1">
-          <div><strong style="color:#8088a8">DB callback A</strong> runs → <em>res.json(rows) · response sent to client A</em></div>
-        </div>
-
-        <div class="micro-sep">↓ &nbsp; microtask queue drained completely before next I/O callback &nbsp; ↓</div>
-
-        <div class="exec-step step-mA">
-          <div><strong style="color:#9a7ab8">fetch .then() A</strong> → <em>res.json(data) · response sent to externalUsers client A</em></div>
-        </div>
-        <div class="exec-step step-mB">
-          <div><strong style="color:#8a80b0">fetch .then() B</strong> → <em>res.json(data) · response sent to externalUsers client B</em><br><span style="color:#334155;font-size:0.8rem">↳ second microtask runs immediately — the queue is fully emptied, not just one item</span></div>
-        </div>
-
-        <div class="micro-sep">↓ &nbsp; microtask queue empty — I/O queue resumes &nbsp; ↓</div>
-
-        <div class="exec-step step-db2">
-          <div><strong style="color:#9088b0">DB callback B</strong> runs → <em>res.json(rows) · response sent to client B</em></div>
-        </div>
-
-        <div class="micro-sep empty">↓ &nbsp; microtask queue empty — I/O queue resumes &nbsp; ↓</div>
-
-        <div class="exec-step step-chunk">
-          <div><strong style="color:#6aab8f">stream data event — chunk #1</strong> → callback runs → <em>chunk forwarded to S3 via PassThrough</em></div>
-        </div>
-
-      </div>
-    </div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-check dimmed"><div class="ph-name">Check</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>Queue empty</div></div></div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-close dimmed"><div class="ph-name">Close callbacks</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>Stream still open, sending chunks</div></div></div>
-
-    <!-- ══ CYCLES 3…N ══ -->
-    <div class="cycle-label stream">Cycles 3…N — upload in progress, one cycle per chunk</div>
-
-    <div class="phase ph-poll">
-            <div class="ph-name">Poll — repeats for every file chunk</div>
-      <div class="ph-desc">Each time the OS has a new chunk ready, a data event fires</div>
-      <div class="ph-events">
-        <div class="chunk-repeat">
-          <span style="font-size:1rem;color:#1a3530">↻</span>
-          <div>
-            <strong style="color:#6aab8f">stream data event — chunk #2, #3, … #N</strong><br>
-            <span style="color:#4b5563">Each chunk: Poll callback → forwarded to PassThrough → buffered → sent to S3.<br>
-            If S3 is too slow → backpressure → <em>write()</em> returns <em>false</em> → stream paused → resumes on <em>drain</em> event (also Poll)</span>
-          </div>
-        </div>
-        <div class="ev ev-end" style="margin-top:4px"><div class="ev-dot" style="background:#5a9a85"></div><strong>stream end event</strong> — all chunks sent · S3 finalizes the upload</div>
-      </div>
-    </div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-close dimmed"><div class="ph-name">Close callbacks</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>Stream not yet closed</div></div></div>
-
-    <!-- ══ FINAL CYCLE ══ -->
-    <div class="cycle-label s3done">Final cycle — S3 confirmed · stream closes</div>
-
-    <div class="phase ph-timers dimmed"><div class="ph-name">Timers</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>None</div></div></div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-pending dimmed"><div class="ph-name">Pending callbacks</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>Queue empty</div></div></div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-idle dimmed"><div class="ph-name">Idle / Prepare</div></div>
-    <div class="arrow">↓</div>
-
-    <div class="phase ph-poll">
-            <div class="ph-name">Poll</div>
-      <div class="ph-desc">S3 sends upload confirmation</div>
-      <div class="ph-events">
-        <div class="ev ev-s3done"><div class="ev-dot" style="background:#b08050"></div><div><strong>S3 upload callback</strong> — upload complete · <em>res.json({ ok: true }) · response sent to POST client</em></div></div>
-        <div class="ev ev-end" style="margin-top:2px"><div class="ev-dot" style="background:#5a9a85"></div><div><strong>stream finish event</strong> — Writable done flushing · stream is destroyed · <em>close event queued for phase 6</em></div></div>
-      </div>
-    </div>
-    <div class="arrow">↓</div>
-    <div class="phase ph-check dimmed"><div class="ph-name">Check</div><div class="ph-events"><div class="ev ev-empty"><div class="ev-dot" style="background:#1e2d3d"></div>Queue empty</div></div></div>
-    <div class="arrow">↓</div>
-
-    <div class="phase ph-close active">
-            <div class="ph-name">Close callbacks ← finally active!</div>
-      <div class="ph-desc">The stream was destroyed — its close event lands here</div>
-      <div class="ph-events">
-        <div class="ev ev-close"><div class="ev-dot" style="background:#b08888"></div><div><strong>stream close event</strong> — cleanup callback runs · <em>resources freed · socket closed · memory released</em><br><em>→ this is the reason phase 6 exists</em></div></div>
-      </div>
-    </div>
-    <div class="arrow" style="color:#6b9a7e;font-size:1.3rem">↺ loop continues…</div>
-
-  </div>
-
-</div>
-
-<!-- ══ HORIZONTAL TIMELINE ══ -->
-<div class="timeline-wrap">
-  <div class="tl-title">Execution timeline — all events in order</div>
-
-  <!-- Cycle 1 -->
-  <div class="tl-cycle">
-    <div class="tl-cycle-lbl">Cycle 1<br><span style="color:#1e293b;font-weight:400">Poll</span></div>
-    <div class="tl-events">
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#12111d;color:#7a82b8">Poll</div>
-        <div class="tl-chip" style="background:#12111d;color:#7a82b8;border-color:#252048">GET /users A</div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#12111d;color:#8a80b0">Poll</div>
-        <div class="tl-chip" style="background:#151030;color:#8a80b0;border-color:#282850">GET /users B</div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#0e1814;color:#5a9a85">Poll</div>
-        <div class="tl-chip" style="background:#0e1814;color:#5a9a85;border-color:#142520">GET /ext A</div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#0e1512;color:#6aab8f">Poll</div>
-        <div class="tl-chip" style="background:#0e1512;color:#6aab8f;border-color:#1a3530">GET /ext B</div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#141008;color:#b08050">Poll</div>
-        <div class="tl-chip" style="background:#141008;color:#b08050;border-color:#4a2010">POST /upload</div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#13120e;color:#b0a05c">Check</div>
-        <div class="tl-chip" style="background:#13120e;color:#b0a05c;border-color:#352510">setImmediate</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="tl-sep"></div>
-
-  <!-- Cycle 2 -->
-  <div class="tl-cycle">
-    <div class="tl-cycle-lbl">Cycle 2<br><span style="color:#1e293b;font-weight:400">Timers + Poll</span></div>
-    <div class="tl-events">
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#141008;color:#b09050">Timers</div>
-        <div class="tl-chip" style="background:#141008;color:#b09050;border-color:#352010">setTimeout(0)</div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#161520;color:#8088a8">Poll</div>
-        <div class="tl-chip" style="background:#161520;color:#8088a8;border-color:#282850">DB cb A</div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-micro-group">
-        <div class="tl-micro-lbl">microtasks — fully drained</div>
-        <div class="tl-micro-row">
-          <div class="tl-event">
-            <div class="tl-badge" style="background:#151030;color:#9a7ab8">μ</div>
-            <div class="tl-chip" style="background:#151030;color:#9a7ab8;border:1px dashed #503890">fetch.then() A</div>
-          </div>
-          <span class="tl-arr" style="padding-top:20px">→</span>
-          <div class="tl-event">
-            <div class="tl-badge" style="background:#141028;color:#8a80b0">μ</div>
-            <div class="tl-chip" style="background:#141028;color:#8a80b0;border:1px dashed #453080">fetch.then() B</div>
-          </div>
-        </div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#161520;color:#9088b0">Poll</div>
-        <div class="tl-chip" style="background:#161520;color:#9088b0;border-color:#382870">DB cb B</div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#0e1815;color:#6aab8f">Poll</div>
-        <div class="tl-chip" style="background:#0e1815;color:#6aab8f;border-color:#1a3530">chunk #1</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="tl-sep"></div>
-
-  <!-- Cycles 3…N -->
-  <div class="tl-cycle">
-    <div class="tl-cycle-lbl">Cycles 3…N<br><span style="color:#1e293b;font-weight:400">Poll (upload)</span></div>
-    <div class="tl-events">
-      <div class="tl-repeat">
-        <span style="font-size:1.1rem">↻</span>
-        <span><strong style="color:#6aab8f">chunk #2, #3, … #N</strong> <span style="color:#4b5563">— Poll, one cycle per chunk · backpressure via drain if S3 is slow</span></span>
-      </div>
-    </div>
-  </div>
-
-  <div class="tl-sep"></div>
-
-  <!-- Final cycle -->
-  <div class="tl-cycle">
-    <div class="tl-cycle-lbl">Final cycle<br><span style="color:#1e293b;font-weight:400">Poll + Close</span></div>
-    <div class="tl-events">
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#151008;color:#b08050">Poll</div>
-        <div class="tl-chip" style="background:#151008;color:#b08050;border-color:#4a2010">S3 upload done</div>
-      </div>
-      <span class="tl-arr">→</span>
-      <div class="tl-event">
-        <div class="tl-badge" style="background:#141008;color:#b08888">Close cb</div>
-        <div class="tl-chip" style="background:#141008;color:#b08888;border-color:#4a1818">stream close</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- WHERE EACH OPERATION LANDS -->
-<div class="ops-grid">
-  <div class="ops-title">Where each operation lands</div>
-  <div class="ops-items">
-    <div class="ops-item"><span class="ops-label" style="color:#7a82b8">Incoming requests</span><span class="ops-dest">→ Poll</span></div>
-    <div class="ops-item"><span class="ops-label" style="color:#b0a05c">setImmediate</span><span class="ops-dest">→ Check (same cycle)</span></div>
-    <div class="ops-item"><span class="ops-label" style="color:#b09050">setTimeout(0)</span><span class="ops-dest">→ Timers (next cycle)</span></div>
-    <div class="ops-item"><span class="ops-label" style="color:#8088a8">DB callbacks</span><span class="ops-dest">→ Poll</span></div>
-    <div class="ops-item"><span class="ops-label" style="color:#9a7ab8">fetch .then()</span><span class="ops-dest">→ microtask queue</span></div>
-    <div class="ops-item"><span class="ops-label" style="color:#6aab8f">data / end / drain</span><span class="ops-dest">→ Poll</span></div>
-    <div class="ops-item"><span class="ops-label" style="color:#b08888">stream close</span><span class="ops-dest">→ Close callbacks</span></div>
-  </div>
-</div>
-
-<!-- ORDER STRIP -->
-<div class="order-strip">
-  <div class="order-title">Full execution order</div>
-  <div class="order-items">
-    <div class="oi" style="background:#12111d;color:#7a82b8">Poll C1<br>GET /users A</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#151030;color:#8a80b0">Poll C1<br>GET /users B</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#0e1814;color:#5a9a85">Poll C1<br>GET /ext A</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#0e1512;color:#6aab8f">Poll C1<br>GET /ext B</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#141008;color:#b08050">Poll C1<br>POST /upload</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#13120e;color:#b0a05c">Check C1<br>setImmediate</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#141008;color:#b09050">Timers C2<br>setTimeout(0)</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#161520;color:#8088a8">Poll C2<br>DB cb A</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#151030;color:#9a7ab8;border:1px dashed #503890">microtask<br>fetch.then() A</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#141028;color:#8a80b0;border:1px dashed #453080">microtask<br>fetch.then() B</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#161520;color:#9088b0">Poll C2<br>DB cb B</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#0d1f18;color:#6aab8f">Poll C2<br>chunk #1</div><span class="oi-arrow">→</span>
-    <span class="oi-dots">···</span>
-    <div class="oi" style="background:#141008;color:#b08050">Poll Cf<br>S3 done</div><span class="oi-arrow">→</span>
-    <div class="oi" style="background:#141008;color:#b08888;border:1px solid #4a1818">Close cb<br>stream close</div>
-  </div>
-  <div class="order-note">
-    <strong>The key insight about multiple microtasks and :</strong>
-    After DB callback A completes, Node.js drains the <span class="hl-purple">entire microtask queue</span> before picking the next I/O callback.
-    Both <em>fetch .then() A</em> and <em>fetch .then() B</em> are in that queue, so they both run — one after the other — before DB callback B gets a turn.
-    It is not "one microtask per I/O callback" — it is "all pending microtasks, in order, before the next I/O callback".<br><br>
-    <strong>Backpressure:</strong> if S3 is slower than the incoming data, <span class="hl-green">write() returns false</span> → the Readable pauses automatically → resumes when <em>drain</em> fires in Poll. No blocking, no busy-waiting — all event-driven.<br><br>
-    <span class="hl-orange">stream close </span> is the only stream event that does not land in Poll — it goes to <strong>phase 6 Close callbacks</strong>, guaranteeing that all other processing on that stream has already completed before cleanup runs. <span class="hl-red">This is why phase 6 exists.</span>
-  </div>
-</div>
-
-
-<!-- KEY INSIGHT BOX -->
-<div style="max-width:1100px; margin:20px auto 0; background:#0d1117; border:1px solid #503890; border-radius:12px; padding:24px 28px;">
-
-  <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
-    <div style="width:8px; height:8px; border-radius:50%; background:#9a7ab8; flex-shrink:0;"></div>
-    <span style="font-size:0.82rem; text-transform:uppercase; letter-spacing:0.12em; color:#503890; font-weight:700;">Key insight — microtask queue</span>
-  </div>
-
-  <p style="font-size:0.9rem; font-weight:700; color:#e2e8f0; margin-bottom:14px; line-height:1.5;">
-    It is not "one microtask per I/O callback" —<br>
-    it is <span style="color:#9a7ab8;">all pending microtasks, fully drained in order</span>, before the next I/O callback gets a turn.
+<!-- PAGE HEADER -->
+<div class="page-header">
+  <h1>Node.js Event Loop</h1>
+  <p class="tagline">
+    <span class="method-pill">POST</span>
+    <span class="path-text">/request</span>
+    &nbsp;—&nbsp; A phase-by-phase walkthrough
   </p>
+</div>
 
-  <!-- visual proof -->
-  <div style="background:#080c14; border:1px solid #1e1048; border-radius:9px; padding:16px 18px; margin-bottom:16px; font-family:'JetBrains Mono','Fira Code',monospace; font-size:0.88rem; line-height:2;">
 
-    <div style="color:#475569; margin-bottom:6px; font-family:'Segoe UI',system-ui,sans-serif; font-size:0.8rem; text-transform:uppercase; letter-spacing:0.1em;">Execution order inside Poll — Cycle 2</div>
+<!--=======================================================
+    SECTION 1 — EVENT LOOP PHASES
+========================================================-->
+<div class="sec-header">
+  <div class="sec-num">1</div>
+  <div class="sec-text">
+    <div class="sec-title">Event Loop Phases</div>
+    <div class="sec-sub">Six phases executed in order on every iteration, plus two priority queues that drain between every phase</div>
+  </div>
+  <div class="sec-line"></div>
+</div>
 
-    <div style="display:flex; align-items:center; gap:8px;">
-      <span style="background:#282850; color:#e0e7ff; border-radius:4px; padding:2px 8px; font-size:0.8rem; font-weight:700;">I/O</span>
-      <span style="color:#8088a8;">DB callback A</span>
-      <span style="color:#475569;">→ res.json()  &nbsp;·&nbsp; response sent to client A</span>
+<div class="phases-grid">
+
+  <div class="phase-card ph1">
+    <div class="pc-num">Phase 1</div>
+    <div class="pc-name">Timers</div>
+    <div class="pc-desc">
+      Executes callbacks whose minimum delay has elapsed, registered via
+      <code>setTimeout()</code> or <code>setInterval()</code>.
+      The delay is a <em>threshold</em>, not a guarantee — OS scheduling or a busy
+      Poll phase can push it later.
     </div>
-
-    <div style="border-left:2px dashed #503890; margin-left:11px; padding-left:14px; margin-top:2px; margin-bottom:2px;">
-      <div style="color:#64748b; font-family:'Segoe UI',system-ui,sans-serif; font-size:0.8rem; margin-bottom:4px;">— microtask queue drained completely —</div>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span style="background:#503890; color:#f5f3ff; border-radius:4px; padding:2px 8px; font-size:0.8rem; font-weight:700;">μ</span>
-        <span style="color:#9a7ab8;">fetch .then() A</span>
-        <span style="color:#475569;">→ res.json()  &nbsp;·&nbsp; response sent to extUsers A</span>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-        <span style="background:#453080; color:#ede9fe; border-radius:4px; padding:2px 8px; font-size:0.8rem; font-weight:700;">μ</span>
-        <span style="color:#8a80b0;">fetch .then() B</span>
-        <span style="color:#475569;">→ res.json()  &nbsp;·&nbsp; response sent to extUsers B</span>
-      </div>
-      <div style="color:#334155; font-family:'Segoe UI',system-ui,sans-serif; font-size:0.8rem; margin-top:6px;">if had queued another .then(), it would run here too — before any I/O callback</div>
-    </div>
-
-    <div style="display:flex; align-items:center; gap:8px;">
-      <span style="background:#382870; color:#ede9fe; border-radius:4px; padding:2px 8px; font-size:0.8rem; font-weight:700;">I/O</span>
-      <span style="color:#9088b0;">DB callback B</span>
-      <span style="color:#475569;">→ res.json()  &nbsp;·&nbsp; response sent to client B</span>
-    </div>
-
+    <div class="pc-api">setTimeout(fn, 0) · setInterval(fn, n)</div>
   </div>
 
-  <!-- three rules -->
-  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
-
-    <div style="background:#12111d; border:1px solid #1e1048; border-radius:8px; padding:12px 14px;">
-      <div style="font-size:0.82rem; color:#503890; text-transform:uppercase; letter-spacing:0.1em; font-weight:700; margin-bottom:6px;">Rule 1 — Full drain</div>
-      <div style="font-size:0.88rem; color:#94a3b8; line-height:1.55;">The microtask queue is <span style="color:#9a7ab8; font-weight:600;">fully emptied</span> after every single callback — not just one item. All pending <code style="background:#1e1040; padding:1px 4px; border-radius:3px;">.then()</code> and <code style="background:#1e1040; padding:1px 4px; border-radius:3px;">nextTick()</code> calls run before the loop moves on.</div>
+  <div class="phase-card ph2">
+    <div class="pc-num">Phase 2</div>
+    <div class="pc-name">Pending Callbacks</div>
+    <div class="pc-desc">
+      Runs I/O error callbacks deferred from the previous iteration — the most common
+      case is TCP-level errors such as <code>ECONNREFUSED</code>.
+      Rarely visible in application code.
     </div>
+    <div class="pc-api">TCP ECONNREFUSED · deferred I/O errors</div>
+  </div>
 
-    <div style="background:#12111d; border:1px solid #1e1048; border-radius:8px; padding:12px 14px;">
-      <div style="font-size:0.82rem; color:#503890; text-transform:uppercase; letter-spacing:0.1em; font-weight:700; margin-bottom:6px;">Rule 2 — Recursive risk</div>
-      <div style="font-size:0.88rem; color:#94a3b8; line-height:1.55;">If a microtask <span style="color:#9a7ab8; font-weight:600;">queues another microtask</span>, that one runs too — still before the next I/O callback. A chain of <code style="background:#1e1040; padding:1px 4px; border-radius:3px;">.then()</code> calls can starve the I/O queue indefinitely.</div>
+  <div class="phase-card ph3">
+    <div class="pc-num">Phase 3</div>
+    <div class="pc-name">Idle / Prepare</div>
+    <div class="pc-desc">
+      Used internally by Node.js to prepare state before the upcoming Poll phase.
+      Not reachable from JavaScript — no userland API schedules work here.
+      It exists purely for Node.js bookkeeping.
     </div>
+    <div class="pc-api">— internal use only —</div>
+  </div>
 
-    <div style="background:#12111d; border:1px solid #1e1048; border-radius:8px; padding:12px 14px;">
-      <div style="font-size:0.82rem; color:#503890; text-transform:uppercase; letter-spacing:0.1em; font-weight:700; margin-bottom:6px;">Rule 3 — nextTick first</div>
-      <div style="font-size:0.88rem; color:#94a3b8; line-height:1.55;"><code style="background:#1e1040; padding:1px 4px; border-radius:3px;">process.nextTick()</code> is drained <span style="color:#9a7ab8; font-weight:600;">before</span> Promise microtasks. Within each queue, callbacks run in the order they were queued — FIFO.</div>
+  <div class="phase-card ph4">
+    <div class="pc-num">Phase 4</div>
+    <div class="pc-name">Poll</div>
+    <div class="pc-desc">
+      The most critical phase. Retrieves new I/O events from the OS and executes
+      their callbacks — incoming HTTP requests, DB results, file reads, network
+      responses. When the queue is empty and no timers are pending, the loop
+      <em>blocks here</em> waiting for new events.
     </div>
+    <div class="pc-api">HTTP requests · DB callbacks · fs · fetch network events</div>
+  </div>
 
+  <div class="phase-card ph5">
+    <div class="pc-num">Phase 5</div>
+    <div class="pc-name">Check</div>
+    <div class="pc-desc">
+      Runs all <code>setImmediate()</code> callbacks. Executes immediately after
+      Poll within the <em>same</em> cycle, making it reliably earlier than
+      <code>setTimeout(fn, 0)</code> when called from inside an I/O callback.
+    </div>
+    <div class="pc-api">setImmediate(fn)</div>
+  </div>
+
+  <div class="phase-card ph6">
+    <div class="pc-num">Phase 6</div>
+    <div class="pc-name">Close Callbacks</div>
+    <div class="pc-desc">
+      Handles <code>close</code> events for sockets and handles destroyed abruptly.
+      Runs last so all pending I/O for that resource has already been processed
+      before cleanup code runs.
+    </div>
+    <div class="pc-api">socket.on('close') · stream.destroy()</div>
+  </div>
+
+</div>
+
+<div class="pq-row">
+  <div class="pq-card pq-tick">
+    <div class="pq-name">process.nextTick()</div>
+    <div class="pq-desc">
+      Not a phase — a priority queue. The entire queue is drained after <em>every
+      single callback</em>, before any Promise microtask and before the loop moves
+      to the next phase. Node.js internals (streams, EventEmitter) rely on this
+      for safe state transitions. Recursive calls can starve I/O.
+    </div>
+    <div class="pq-api">process.nextTick(fn)  →  before any .then()</div>
+  </div>
+  <div class="pq-card pq-prom">
+    <div class="pq-name">Promise Microtasks</div>
+    <div class="pq-desc">
+      Drains after <code>nextTick</code> but still before the loop advances.
+      The whole queue is emptied — if a microtask enqueues another, that one runs
+      too. Every resolved <code>await</code> or <code>.then()</code> lands here.
+      <code>fetch()</code> uses this queue for its resolution chain.
+    </div>
+    <div class="pq-api">Promise.resolve().then(fn) · async / await</div>
   </div>
 </div>
 
+<div class="info-note">
+  <strong>One thread, never blocked.</strong>
+  JavaScript runs on a single thread, but all I/O (network, DB, disk) is delegated to
+  <strong>libuv</strong>, which uses a thread pool + OS async APIs.
+  When work completes, libuv re-enters Node.js through the Poll phase.
+  The JS thread stays free the entire time.
+</div>
+
+
+<!--=======================================================
+    SECTION 2 — WHAT THE REQUEST DOES
+========================================================-->
+<div class="sec-header">
+  <div class="sec-num">2</div>
+  <div class="sec-text">
+    <div class="sec-title">What POST /request Does</div>
+    <div class="sec-sub">Four operations — four different event loop destinations</div>
+  </div>
+  <div class="sec-line"></div>
+</div>
+
+<div class="code-wrap">
+  <div class="code-top">
+    <div class="code-dots">
+      <div class="code-dot" style="background:#ff5f57"></div>
+      <div class="code-dot" style="background:#ffbd2e"></div>
+      <div class="code-dot" style="background:#28c840"></div>
+    </div>
+    <div class="code-filename">server.js</div>
+  </div>
+<pre><span class="ck">import</span> http <span class="ck">from</span> <span class="cs">'node:http'</span>;
+<span class="ck">import</span> { writeFile } <span class="ck">from</span> <span class="cs">'node:fs/promises'</span>;
+<span class="ck">import</span> db <span class="ck">from</span> <span class="cs">'./db.js'</span>;
+
+<span class="ck">const</span> server <span class="ck">=</span> http.<span class="cf">createServer</span>((req, res) =&gt; {
+  <span class="ck">if</span> (req.method === <span class="cs">'POST'</span> &amp;&amp; req.url === <span class="cs">'/request'</span>) {
+
+    <span class="cm">// ① Synchronous — executes immediately</span>
+    <span class="op1">console</span>.<span class="op1">log</span>(<span class="cs">'start'</span>);
+
+    <span class="cm">// ② Schedules for the Check phase</span>
+    <span class="op2">setImmediate</span>(() =&gt; {
+      <span class="op2">console</span>.<span class="op2">log</span>(<span class="cs">'setImmediate'</span>);
+    });
+
+    <span class="cm">// ③ Async DB query (callback style to continue to step 4)</span>
+    <span class="op3">db</span>.<span class="op3">query</span>(<span class="cs">'SELECT * FROM table'</span>, (err, rows) =&gt; {
+      <span class="ck">if</span> (err) {
+        res.<span class="cf">writeHead</span>(<span class="cn">500</span>);
+        <span class="ck">return</span> res.<span class="cf">end</span>(<span class="cs">'Database Error'</span>);
+      }
+      res.<span class="cf">writeHead</span>(<span class="cn">200</span>, { <span class="cs">'Content-Type'</span>: <span class="cs">'application/json'</span> });
+      res.<span class="cf">end</span>(<span class="cc">JSON</span>.<span class="cf">stringify</span>(rows));
+    });
+
+    <span class="cm">// ④ Timer phase</span>
+    <span class="op4">setTimeout</span>(<span class="ck">async</span> () =&gt; {
+      <span class="ck">const</span> response <span class="ck">=</span> <span class="ck">await</span> <span class="op4a">fetch</span>(<span class="cs">'https://api.example.com/data'</span>);
+      <span class="ck">const</span> json     <span class="ck">=</span> <span class="ck">await</span> response.<span class="op4a">json</span>();
+      <span class="ck">await</span> <span class="op4b">writeFile</span>(<span class="cs">'log.txt'</span>, <span class="cc">JSON</span>.<span class="cf">stringify</span>(json, <span class="ck">null</span>, <span class="cn">2</span>));
+
+      <span class="cf">console</span>.<span class="cf">log</span>(<span class="cs">'log.txt saved successfully'</span>);
+    }, <span class="cn">0</span>);
+
+  }
+});
+
+server.<span class="cf">listen</span>(<span class="cn">3000</span>, () =&gt; {
+  <span class="cf">console</span>.<span class="cf">log</span>(<span class="cs">'Server listening on http://localhost:3000'</span>);
+});</pre>
+</div>
+
+
+<!--=======================================================
+    SECTION 3 — HOW NODE.JS MANAGES THE REQUEST
+========================================================-->
+<div class="sec-header">
+  <div class="sec-num">3</div>
+  <div class="sec-text">
+    <div class="sec-title">How Node.js Manages the Request</div>
+    <div class="sec-sub">Each event loop cycle, all six phases — showing exactly when every callback fires</div>
+  </div>
+  <div class="sec-line"></div>
+</div>
+
+<div class="cycle-col">
+
+  <!-- CYCLE 1 -->
+  <div class="cycle-card">
+    <div class="cycle-head">
+      <div class="cycle-badge">
+        <div class="cb-lbl">Cycle</div>
+        <div class="cb-num">1</div>
+      </div>
+      <div class="cycle-info">
+        <div class="ci-title">Request arrives — synchronous code runs, async ops are registered</div>
+        <div class="ci-sub">All four operations are initiated in this cycle. Sync code runs inline in Poll. setImmediate fires in Check. The DB query and setTimeout(0) are delegated — their callbacks land in future cycles.</div>
+      </div>
+    </div>
+    <div class="phase-rows">
+
+      <div class="phase-row pr-timers dim">
+        <div class="pr-label">Timers</div>
+        <div class="pr-body"><div class="pr-empty">No timers registered yet — queue empty</div></div>
+      </div>
+
+      <div class="phase-row pr-pending dim">
+        <div class="pr-label">Pending</div>
+        <div class="pr-body"><div class="pr-empty">No deferred I/O errors — queue empty</div></div>
+      </div>
+
+      <div class="phase-row pr-idle dim">
+        <div class="pr-label">Idle/Prep</div>
+        <div class="pr-body"><div class="pr-empty">Internal Node.js use only</div></div>
+      </div>
+
+      <div class="phase-row pr-poll">
+        <div class="pr-label">Poll ★</div>
+        <div class="pr-body">
+          <div class="ev-list">
+            <div class="ev">
+              <div class="ev-dot" style="background:#7a82b8"></div>
+              <div><strong style="color:#7a82b8">POST /request arrives</strong> — OS delivers the incoming HTTP request; Node.js fires the handler callback</div>
+            </div>
+            <div class="ev">
+              <div class="ev-dot" style="background:#60a5fa"></div>
+              <div><span class="op1">① console.log('start')</span> — runs <strong>synchronously inline</strong>, no scheduling needed · printed: <code style="background:#0a1220;color:#60a5fa">"start"</code></div>
+            </div>
+            <div class="ev">
+              <div class="ev-dot" style="background:#fbbf24"></div>
+              <div><span class="op2">② setImmediate(fn)</span> — callback pushed into the <strong style="color:#fbbf24">Check queue</strong> · will fire right after this Poll phase ends, in the same cycle</div>
+            </div>
+            <div class="ev">
+              <div class="ev-dot" style="background:#a78bfa"></div>
+              <div><span class="op3">③ db.query('SELECT * FROM table', cb)</span> — <strong style="color:#a78bfa">delegated to libuv thread pool</strong> · JS thread is free instantly · callback enqueued when DB responds · will send HTTP 200 (or 500 on error)</div>
+            </div>
+            <div class="ev">
+              <div class="ev-dot" style="background:#fb923c"></div>
+              <div><span class="op4">④ setTimeout(asyncFn, 0)</span> — <strong style="color:#fb923c">timer registered</strong> · 0 ms threshold → eligible for Timers phase on the next iteration · <code>async</code> function uses <code>await</code> for fetch, JSON parse, and <code>writeFile</code> (all Promise-based) · handler returns</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row pr-check">
+        <div class="pr-label">Check ★</div>
+        <div class="pr-body">
+          <div class="ev-list">
+            <div class="ev">
+              <div class="ev-dot" style="background:#fbbf24"></div>
+              <div><span class="op2">② setImmediate callback fires</span> — <code style="background:#0e0c04;color:#fbbf24">console.log('setImmediate')</code> printed · same cycle as the request, right after Poll · <em>fires before</em> the <code>setTimeout(0)</code> which belongs to the next cycle's Timers phase</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row pr-close dim">
+        <div class="pr-label">Close</div>
+        <div class="pr-body"><div class="pr-empty">No close events — queue empty</div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="cycle-arrow">↓</div>
+
+  <!-- CYCLE 2 -->
+  <div class="cycle-card">
+    <div class="cycle-head">
+      <div class="cycle-badge">
+        <div class="cb-lbl">Cycle</div>
+        <div class="cb-num">2</div>
+      </div>
+      <div class="cycle-info">
+        <div class="ci-title">setTimeout(0) fires in Timers · DB result arrives in Poll</div>
+        <div class="ci-sub">Timers runs first: the 0 ms delay has elapsed, so the callback executes and initiates <code>fetch()</code>. Poll runs next and handles the DB result — the HTTP response is sent to the client.</div>
+      </div>
+    </div>
+    <div class="phase-rows">
+
+      <div class="phase-row pr-timers">
+        <div class="pr-label">Timers ★</div>
+        <div class="pr-body">
+          <div class="ev-list">
+            <div class="ev">
+              <div class="ev-dot" style="background:#fb923c"></div>
+              <div><span class="op4">④ setTimeout callback fires</span> — 0 ms threshold elapsed · <strong style="color:#fb923c">asyncFn() begins executing</strong></div>
+            </div>
+            <div class="ev">
+              <div class="ev-dot" style="background:#34d399"></div>
+              <div><span class="op4a">fetch('https://api.example.com/data')</span> called — <strong style="color:#34d399">async network I/O initiated</strong> via OS · returns a pending Promise · execution suspends at <code>await</code> · callback returns control to the loop</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row pr-pending dim">
+        <div class="pr-label">Pending</div>
+        <div class="pr-body"><div class="pr-empty">Queue empty</div></div>
+      </div>
+
+      <div class="phase-row pr-idle dim">
+        <div class="pr-label">Idle/Prep</div>
+        <div class="pr-body"><div class="pr-empty">Internal Node.js use only</div></div>
+      </div>
+
+      <div class="phase-row pr-poll">
+        <div class="pr-label">Poll ★</div>
+        <div class="pr-body">
+          <div class="ev-list">
+            <div class="ev">
+              <div class="ev-dot" style="background:#a78bfa"></div>
+              <div><span class="op3">③ DB query result arrives</span> — libuv signals completion · <strong style="color:#a78bfa">db.query callback runs</strong> · on error: <code>res.writeHead(500)</code> · on success: <code>res.writeHead(200)</code> + <code>res.end(JSON.stringify(rows))</code> · <strong>HTTP response sent to client ✓</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row pr-check dim">
+        <div class="pr-label">Check</div>
+        <div class="pr-body"><div class="pr-empty">setImmediate queue empty</div></div>
+      </div>
+
+      <div class="phase-row pr-close dim">
+        <div class="pr-label">Close</div>
+        <div class="pr-body"><div class="pr-empty">Queue empty</div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="cycle-arrow">↓</div>
+
+  <div class="cycle-gap">
+    <div class="cg-text">⟳ &nbsp; Cycles 3 … N — loop continues, waiting for the fetch network response</div>
+    <div class="cg-sub">The loop blocks in Poll, waiting for the OS to signal that <code>api.example.com</code> has responded. Other incoming requests are processed normally during this time.</div>
+  </div>
+
+  <div class="cycle-arrow">↓</div>
+
+  <!-- CYCLE N -->
+  <div class="cycle-card">
+    <div class="cycle-head">
+      <div class="cycle-badge">
+        <div class="cb-lbl">Cycle</div>
+        <div class="cb-num">N</div>
+      </div>
+      <div class="cycle-info">
+        <div class="ci-title">fetch() resolves — microtask chain runs — await writeFile() initiated</div>
+        <div class="ci-sub">The OS signals that the HTTP response from the external API has arrived. The Poll I/O event resolves the fetch Promise, draining two microtasks before the next Poll callback gets a turn.</div>
+      </div>
+    </div>
+    <div class="phase-rows">
+
+      <div class="phase-row pr-timers dim">
+        <div class="pr-label">Timers</div>
+        <div class="pr-body"><div class="pr-empty">No pending timers</div></div>
+      </div>
+
+      <div class="phase-row pr-pending dim">
+        <div class="pr-label">Pending</div>
+        <div class="pr-body"><div class="pr-empty">Queue empty</div></div>
+      </div>
+
+      <div class="phase-row pr-idle dim">
+        <div class="pr-label">Idle/Prep</div>
+        <div class="pr-body"><div class="pr-empty">Internal Node.js use only</div></div>
+      </div>
+
+      <div class="phase-row pr-poll">
+        <div class="pr-label">Poll ★</div>
+        <div class="pr-body">
+          <div class="ev-list">
+            <div class="ev">
+              <div class="ev-dot" style="background:#34d399"></div>
+              <div><strong style="color:#34d399">Network I/O event fires</strong> — OS signals that the fetch HTTP response is ready · the underlying I/O callback runs, <strong>resolving the fetch Promise</strong></div>
+            </div>
+          </div>
+
+          <div class="mu-box">
+            <div class="mu-label">↓ &nbsp; microtask queue — drained completely before the next Poll event &nbsp; ↓</div>
+
+            <div class="mu-ev">
+              <div class="ev-dot" style="background:#9a7ab8; flex-shrink:0; margin-top:4px;"></div>
+              <div>
+                <strong style="color:#9a7ab8">μ &nbsp;</strong>
+                <span class="op4a">await fetch()</span> continuation —
+                <code>response</code> object now available ·
+                <span class="op4a">response.json()</span> called → returns a new pending Promise · suspends at next <code>await</code>
+              </div>
+            </div>
+
+            <div class="mu-ev" style="border-top-color:#1e1048; margin-top:4px; padding-top:4px;">
+              <div class="ev-dot" style="background:#8a80b0; flex-shrink:0; margin-top:4px;"></div>
+              <div>
+                <strong style="color:#8a80b0">μ &nbsp;</strong>
+                <span class="op4a">await response.json()</span> continuation —
+                JSON parsed · <code>json</code> data available ·
+                <span class="op4b">writeFile('log.txt', JSON.stringify(json, null, 2))</span> called from <code>node:fs/promises</code> →
+                <strong style="color:#22d3ee">Promise-based I/O delegated to libuv</strong> · async function suspends at <code>await writeFile()</code>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="phase-row pr-check dim">
+        <div class="pr-label">Check</div>
+        <div class="pr-body"><div class="pr-empty">Queue empty</div></div>
+      </div>
+
+      <div class="phase-row pr-close dim">
+        <div class="pr-label">Close</div>
+        <div class="pr-body"><div class="pr-empty">Queue empty</div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="cycle-arrow">↓</div>
+
+  <!-- CYCLE N+1 -->
+  <div class="cycle-card">
+    <div class="cycle-head">
+      <div class="cycle-badge">
+        <div class="cb-lbl">Cycle</div>
+        <div class="cb-num">N+1</div>
+      </div>
+      <div class="cycle-info">
+        <div class="ci-title">writeFile Promise resolves — log.txt saved, console.log fires via microtask</div>
+        <div class="ci-sub">libuv signals that the file write finished. Because <code>writeFile</code> is from <code>node:fs/promises</code>, completion resolves its Promise. The <code>await writeFile()</code> continuation runs as a microtask — <code>console.log('log.txt saved successfully')</code> executes before the next I/O callback. The full lifecycle of the POST /request is now complete.</div>
+      </div>
+    </div>
+    <div class="phase-rows">
+
+      <div class="phase-row pr-timers dim">
+        <div class="pr-label">Timers</div>
+        <div class="pr-body"><div class="pr-empty">No pending timers</div></div>
+      </div>
+
+      <div class="phase-row pr-pending dim">
+        <div class="pr-label">Pending</div>
+        <div class="pr-body"><div class="pr-empty">Queue empty</div></div>
+      </div>
+
+      <div class="phase-row pr-idle dim">
+        <div class="pr-label">Idle/Prep</div>
+        <div class="pr-body"><div class="pr-empty">Internal Node.js use only</div></div>
+      </div>
+
+      <div class="phase-row pr-poll">
+        <div class="pr-label">Poll ★</div>
+        <div class="pr-body">
+          <div class="ev-list">
+            <div class="ev">
+              <div class="ev-dot" style="background:#22d3ee"></div>
+              <div>
+                <span class="op4b">④ writeFile I/O event fires</span> —
+                libuv signals the write is done ·
+                <strong style="color:#22d3ee">fs/promises Promise resolves</strong> ·
+                <code>await writeFile()</code> continuation queued as a microtask
+              </div>
+            </div>
+          </div>
+
+          <div class="mu-box">
+            <div class="mu-label">↓ &nbsp; microtask queue — drained before the next Poll event &nbsp; ↓</div>
+            <div class="mu-ev">
+              <div class="ev-dot" style="background:#22d3ee; flex-shrink:0; margin-top:4px;"></div>
+              <div>
+                <strong style="color:#22d3ee">μ &nbsp;</strong>
+                <span class="op4b">await writeFile()</span> continuation —
+                write confirmed ·
+                <code style="background:#0b1a1e;color:#22d3ee">console.log('log.txt saved successfully')</code> printed ·
+                <strong>full operation complete ✓</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase-row pr-check dim">
+        <div class="pr-label">Check</div>
+        <div class="pr-body"><div class="pr-empty">Queue empty</div></div>
+      </div>
+
+      <div class="phase-row pr-close dim">
+        <div class="pr-label">Close</div>
+        <div class="pr-body"><div class="pr-empty">Queue empty</div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="cycle-arrow" style="color:#6b9a7e;font-size:1.5rem">↺ loop continues…</div>
+
+</div>
+
+
+<!-- TIMELINE SUMMARY -->
+<div class="timeline">
+  <div class="tl-title">Full execution order — timeline</div>
+
+  <div class="tl-row">
+    <span class="tl-cl">Cycle 1</span>
+    <div class="tl-item">
+      <div class="tl-badge" style="background:#11121d;color:#7a82b8">Poll</div>
+      <div class="tl-chip" style="background:#0d1828;color:#60a5fa;border-color:#1a304a">① console.log<br>"start"</div>
+    </div>
+    <span class="tl-arr">→</span>
+    <div class="tl-item">
+      <div class="tl-badge" style="background:#11121d;color:#7a82b8">Poll</div>
+      <div class="tl-chip" style="background:#110d1e;color:#a78bfa;border-color:#261848">③ db.query<br>→ libuv ↗</div>
+    </div>
+    <span class="tl-arr">→</span>
+    <div class="tl-item">
+      <div class="tl-badge" style="background:#11121d;color:#7a82b8">Poll</div>
+      <div class="tl-chip" style="background:#150d04;color:#fb923c;border-color:#381a00">④ setTimeout<br>registered</div>
+    </div>
+    <span class="tl-arr">→</span>
+    <div class="tl-item">
+      <div class="tl-badge" style="background:#13120e;color:#b0a05c">Check</div>
+      <div class="tl-chip" style="background:#160f05;color:#fbbf24;border-color:#2e1e06">② setImmediate<br>"setImmediate"</div>
+    </div>
+  </div>
+
+  <div class="tl-sep"></div>
+
+  <div class="tl-row">
+    <span class="tl-cl">Cycle 2</span>
+    <div class="tl-item">
+      <div class="tl-badge" style="background:#0e1512;color:#6b9a7e">Timers</div>
+      <div class="tl-chip" style="background:#150d04;color:#fb923c;border-color:#381a00">④ setTimeout<br>fires → fetch ↗</div>
+    </div>
+    <span class="tl-arr">→</span>
+    <div class="tl-item">
+      <div class="tl-badge" style="background:#11121d;color:#7a82b8">Poll</div>
+      <div class="tl-chip" style="background:#110d1e;color:#a78bfa;border-color:#261848">③ db.query cb<br>→ res.end() ✓</div>
+    </div>
+  </div>
+
+  <div class="tl-sep"></div>
+
+  <div class="tl-row">
+    <span class="tl-cl">Cycle N</span>
+    <div class="tl-item">
+      <div class="tl-badge" style="background:#11121d;color:#7a82b8">Poll</div>
+      <div class="tl-chip" style="background:#0d1a10;color:#34d399;border-color:#1a3828">fetch response<br>arrives</div>
+    </div>
+    <span class="tl-arr">→</span>
+    <div class="tl-mu">
+      <div class="tl-mu-lbl">microtasks — fully drained</div>
+      <div class="tl-mu-row">
+        <div class="tl-item">
+          <div class="tl-badge" style="background:#180d38;color:#9a7ab8">μ</div>
+          <div class="tl-chip" style="background:#0c0c18;color:#34d399;border:1px dashed #503890">await fetch<br>→ response.json()</div>
+        </div>
+        <span class="tl-arr" style="padding-bottom:0">→</span>
+        <div class="tl-item">
+          <div class="tl-badge" style="background:#140c30;color:#8a80b0">μ</div>
+          <div class="tl-chip" style="background:#0c0c18;color:#22d3ee;border:1px dashed #304888">await .json()<br>→ await writeFile ↗</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tl-sep"></div>
+
+  <div class="tl-row">
+    <span class="tl-cl">Cycle N+1</span>
+    <div class="tl-item">
+      <div class="tl-badge" style="background:#11121d;color:#7a82b8">Poll</div>
+      <div class="tl-chip" style="background:#0b1a1e;color:#22d3ee;border-color:#183540">writeFile<br>Promise resolves</div>
+    </div>
+    <span class="tl-arr">→</span>
+    <div class="tl-mu">
+      <div class="tl-mu-lbl">microtask</div>
+      <div class="tl-mu-row">
+        <div class="tl-item">
+          <div class="tl-badge" style="background:#140c30;color:#22d3ee">μ</div>
+          <div class="tl-chip" style="background:#0c0c18;color:#22d3ee;border:1px dashed #304888">await writeFile<br>log.txt saved ✓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- EXECUTION ORDER -->
+<div class="exec-order">
+  <div class="eo-title">Callback firing order</div>
+  <div class="eo-row">
+    <div class="eo-item" style="background:#0d1828;color:#60a5fa;border-color:#1a304a">Poll C1<br>① console.log</div>
+    <span class="eo-arr">→</span>
+    <div class="eo-item" style="background:#13120e;color:#fbbf24;border-color:#2e1e06">Check C1<br>② setImmediate</div>
+    <span class="eo-arr">→</span>
+    <div class="eo-item" style="background:#150d04;color:#fb923c;border-color:#381a00">Timers C2<br>④ setTimeout</div>
+    <span class="eo-arr">→</span>
+    <div class="eo-item" style="background:#110d1e;color:#a78bfa;border-color:#261848">Poll C2<br>③ db.query cb</div>
+    <span class="eo-arr">→</span>
+    <div class="eo-item" style="background:#0d1a10;color:#34d399;border-color:#1a3828">Poll CN<br>fetch resolves</div>
+    <span class="eo-arr">→</span>
+    <div class="eo-item" style="background:#0c0c18;color:#9a7ab8;border:1px dashed #503890">μ await fetch<br>→ .json()</div>
+    <span class="eo-arr">→</span>
+    <div class="eo-item" style="background:#0c0c18;color:#22d3ee;border:1px dashed #304888">μ await .json()<br>→ await writeFile</div>
+    <span class="eo-arr">→</span>
+    <div class="eo-item" style="background:#0b1a1e;color:#22d3ee;border-color:#183540">Poll CN+1<br>writeFile resolves</div>
+    <span class="eo-arr">→</span>
+    <div class="eo-item" style="background:#0c0c18;color:#22d3ee;border:1px dashed #304888">μ await writeFile<br>log.txt saved ✓</div>
+  </div>
+  <div class="eo-note">
+    <strong>Why does setImmediate fire before setTimeout(0)?</strong>
+    Both are registered inside a Poll callback (an I/O cycle). <code>setImmediate</code>
+    targets the <strong>Check phase of the current cycle</strong> — Check runs immediately
+    after Poll. <code>setTimeout(0)</code> targets the <strong>Timers phase of the next
+    cycle</strong> — the loop must complete the current cycle first. Inside an I/O
+    callback, this order is deterministic.
+    <br><br>
+    <strong>Why does the DB callback fire in Cycle 2?</strong>
+    <code>db.query()</code> is async work handed to libuv. It finishes sometime after the
+    current Poll callback returns. If the result is ready by Cycle 2's Poll phase, it fires
+    there. If the DB is slower it fires in Cycle 3, 4, etc. — always in a
+    <strong>Poll phase</strong>.
+    <br><br>
+    <strong>Why does console.log('log.txt saved successfully') fire as a microtask?</strong>
+    <code>writeFile</code> is imported from <code>node:fs/promises</code> — it returns a
+    Promise, not a callback. When libuv completes the disk write, the Poll I/O event fires
+    and resolves the Promise. The <code>await writeFile()</code> continuation is then a
+    <strong>Promise microtask</strong> — it runs inside the microtask drain window triggered
+    by that Poll event, before any other I/O callback can execute.
+    This is in contrast to the legacy <code>fs.writeFile(fn, cb)</code> API, where the
+    completion callback would be a separate Poll event in its own loop iteration.
+  </div>
+</div>
+
+
+<!-- KEY INSIGHTS -->
+<div class="insights">
+  <div class="ins-title">Key insights</div>
+
+  <div class="ins-row">
+    <div class="ins-dot" style="background:#fbbf24"></div>
+    <div class="ins-text">
+      <strong>setImmediate vs setTimeout(0) — deterministic inside I/O.</strong>
+      Outside an I/O callback the order is unpredictable (depends on OS timing).
+      Inside one (like our request handler) <code>setImmediate</code> is
+      <em>always</em> first — it targets Check in the current cycle, while
+      <code>setTimeout(0)</code> must wait for the Timers phase of the next cycle.
+    </div>
+  </div>
+
+  <div class="ins-row">
+    <div class="ins-dot" style="background:#a78bfa"></div>
+    <div class="ins-text">
+      <strong>The JS thread never waits for the DB.</strong>
+      <code>db.query()</code> is handed to libuv instantly. The handler registers the
+      timer, queues setImmediate, and <em>returns</em> — all without waiting. The DB
+      result, the setTimeout callback, and the setImmediate callback are all in flight
+      concurrently, each racing to their respective phase.
+    </div>
+  </div>
+
+  <div class="ins-row">
+    <div class="ins-dot" style="background:#34d399"></div>
+    <div class="ins-text">
+      <strong>fetch() resolves through microtasks, not a new Poll event.</strong>
+      When the network response arrives, the underlying I/O callback fires in Poll and
+      resolves the Promise. The <code>await</code> continuation is then a
+      <strong>microtask</strong> — it runs inside the current microtask drain window,
+      before the next I/O callback, not in a separate loop cycle.
+    </div>
+  </div>
+
+  <div class="ins-row">
+    <div class="ins-dot" style="background:#22d3ee"></div>
+    <div class="ins-text">
+      <strong>await writeFile() resolves as a microtask, not a new Poll callback.</strong>
+      Because <code>writeFile</code> comes from <code>node:fs/promises</code>, it returns
+      a Promise. When libuv finishes the disk write, the Poll I/O event resolves that
+      Promise. The <code>await</code> continuation — including
+      <code>console.log('log.txt saved successfully')</code> — runs as a
+      <strong>microtask</strong> in the same drain window, before any other I/O callback.
+      With the legacy <code>fs.writeFile(cb)</code> the completion would arrive as a
+      separate Poll event in its own loop cycle.
+    </div>
+  </div>
+
+  <div class="ins-row">
+    <div class="ins-dot" style="background:#9a7ab8"></div>
+    <div class="ins-text">
+      <strong>Microtask queue drains completely between I/O callbacks.</strong>
+      After the fetch Poll event, <em>all</em> pending microtasks run before the next
+      Poll callback gets a turn. <code>await fetch()</code> and
+      <code>await response.json()</code> drain in Cycle N. After <code>writeFile</code>'s
+      I/O event fires in Cycle N+1, <code>await writeFile()</code> drains as its own
+      microtask — each step uninterrupted by any other I/O callback.
+    </div>
+  </div>
+
+</div>
+
+</div>
 </body>
 </html>
+
